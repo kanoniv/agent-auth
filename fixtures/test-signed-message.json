@@ -1,0 +1,24 @@
+{
+  "description": "Signed message for cross-language verification. Verify using the public key from test-keypair.json.",
+  "expected": {
+    "content_hash_length_hex": 64,
+    "payload": {
+      "action": "resolve",
+      "entity_id": "entity-abc-123",
+      "source": "crm"
+    },
+    "signature_length_hex": 128,
+    "signer_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227"
+  },
+  "signed_message": {
+    "nonce": "217be40e-93a0-420c-a5a4-ade5a8d36438",
+    "payload": {
+      "action": "resolve",
+      "entity_id": "entity-abc-123",
+      "source": "crm"
+    },
+    "signature": "cc326dd66647ea4858f2d772d44f398ef75163074963977ee153c7347ac15fbec006edad2dc7a9f317131c327540b6aa8416644c4d656c6130e9ebee38170f0e",
+    "signer_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+    "timestamp": "2026-03-14T16:34:42.265Z"
+  }
+}

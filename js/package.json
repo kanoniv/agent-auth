@@ -1,0 +1,48 @@
+{
+  "name": "@kanoniv/agent-auth",
+  "version": "0.1.0",
+  "description": "Cryptographic identity primitives for AI agents - Ed25519 keypairs, DIDs, signed envelopes, and provenance entries",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/test/*.js",
+    "pretest": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "agent",
+    "identity",
+    "cryptography",
+    "did",
+    "ed25519",
+    "kanoniv"
+  ],
+  "author": "Kanoniv",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kanoniv/agent-auth"
+  },
+  "homepage": "https://kanoniv.com",
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "@noble/hashes": "^1.5.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+  "did_document": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1"
+    ],
+    "assertionMethod": [
+      "did:kanoniv:21fe31dfa154a261626bf854046fd227#key-1"
+    ],
+    "authentication": [
+      "did:kanoniv:21fe31dfa154a261626bf854046fd227#key-1"
+    ],
+    "id": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+    "verificationMethod": [
+      {
+        "controller": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+        "id": "did:kanoniv:21fe31dfa154a261626bf854046fd227#key-1",
+        "publicKeyBase64": "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=",
+        "type": "Ed25519VerificationKey2020"
+      }
+    ]
+  },
+  "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  "secret_key_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+}

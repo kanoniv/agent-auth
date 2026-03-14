@@ -1,0 +1,80 @@
+name: Release Python
+
+on:
+  push:
+    tags:
+      - "py-v*"
+
+jobs:
+  linux:
+    name: Build Linux wheels
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pip install maturin
+      - run: cd python && maturin build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.python-version }}
+          path: python/target/wheels/*.whl
+
+  macos:
+    name: Build macOS wheels
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: pip install maturin
+      - run: cd python && maturin build --release --target universal2-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.python-version }}
+          path: python/target/wheels/*.whl
+
+  windows:
+    name: Build Windows wheels
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pip install maturin
+      - run: cd python && maturin build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-${{ matrix.python-version }}
+          path: python/target/wheels/*.whl
+
+  publish:
+    name: Publish to PyPI
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}

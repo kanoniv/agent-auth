@@ -1,0 +1,75 @@
+{
+  "description": "Two-entry provenance chain. Entry 2 is parented to entry 1 via content_hash.",
+  "entries": [
+    {
+      "action": "resolve",
+      "agent_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+      "entity_ids": [
+        "entity-abc-123"
+      ],
+      "metadata": {
+        "source": "crm"
+      },
+      "parent_ids": [],
+      "signed_envelope": {
+        "nonce": "5e1e97f0-6255-48d8-9e23-8f4edc551a57",
+        "payload": {
+          "action": "resolve",
+          "agent_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+          "entity_ids": [
+            "entity-abc-123"
+          ],
+          "metadata": {
+            "source": "crm"
+          },
+          "parent_ids": []
+        },
+        "signature": "8ecec50aa08a3ed84e9c058453896cffa5798ad72d5083659b46051cd1d4955aab586f26aa675317e8a4c95432a922ab878b67e90d36bc621249c4af99c3d804",
+        "signer_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+        "timestamp": "2026-03-14T16:34:42.266Z"
+      }
+    },
+    {
+      "action": "merge",
+      "agent_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+      "entity_ids": [
+        "entity-abc-123",
+        "entity-def-456"
+      ],
+      "metadata": {
+        "confidence": 0.95,
+        "reason": "duplicate detected"
+      },
+      "parent_ids": [
+        "27327037488e6d66375eb3510eef5f74aaaa1c683e03d5131375e3b3be2ac4d0"
+      ],
+      "signed_envelope": {
+        "nonce": "3e87c297-b0f4-448a-a602-bf5ad886a34e",
+        "payload": {
+          "action": "merge",
+          "agent_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+          "entity_ids": [
+            "entity-abc-123",
+            "entity-def-456"
+          ],
+          "metadata": {
+            "confidence": 0.95,
+            "reason": "duplicate detected"
+          },
+          "parent_ids": [
+            "27327037488e6d66375eb3510eef5f74aaaa1c683e03d5131375e3b3be2ac4d0"
+          ]
+        },
+        "signature": "79cf6c237f3499b0b4d84d6f94cb208db719a510ca89fc9160a1af22edd12c139f63c2c1abc8034ab2c7e217f7d2a1d43e128d11dbb7bf939e5068fd7e364d07",
+        "signer_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+        "timestamp": "2026-03-14T16:34:42.266Z"
+      }
+    }
+  ],
+  "expected": {
+    "entry_0_agent_did": "did:kanoniv:21fe31dfa154a261626bf854046fd227",
+    "entry_0_parent_count": 0,
+    "entry_1_parent_count": 1,
+    "entry_1_parent_is_entry_0_hash": true
+  }
+}
