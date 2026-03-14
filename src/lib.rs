@@ -55,18 +55,18 @@
 //! assert_eq!(result.root_did, root.identity().did);
 //! ```
 
+pub mod delegation;
 pub mod error;
 pub mod identity;
-pub mod signing;
 pub mod provenance;
-pub mod delegation;
+pub mod signing;
 
+pub use delegation::{
+    verify_delegation_chain, verify_delegation_chain_with_revocation, verify_invocation,
+    verify_invocation_with_revocation, Caveat, Delegation, Invocation, VerificationResult,
+    MAX_CHAIN_DEPTH,
+};
 pub use error::CryptoError;
 pub use identity::{AgentIdentity, AgentKeyPair, ServiceEndpoint};
-pub use signing::SignedMessage;
 pub use provenance::{ActionType, ProvenanceEntry};
-pub use delegation::{
-    Caveat, Delegation, Invocation, VerificationResult, MAX_CHAIN_DEPTH,
-    verify_invocation, verify_invocation_with_revocation,
-    verify_delegation_chain, verify_delegation_chain_with_revocation,
-};
+pub use signing::SignedMessage;

@@ -139,7 +139,10 @@ impl ProvenanceEntry {
     /// Verify only the cryptographic signature, without checking field integrity.
     ///
     /// Use `verify()` instead unless you have a specific reason to skip integrity checks.
-    pub fn verify_signature_only(&self, identity: &crate::AgentIdentity) -> Result<(), CryptoError> {
+    pub fn verify_signature_only(
+        &self,
+        identity: &crate::AgentIdentity,
+    ) -> Result<(), CryptoError> {
         self.signed_envelope.verify(identity)
     }
 
@@ -291,10 +294,7 @@ mod tests {
         assert_eq!(ActionType::Resolve.to_string(), "resolve");
         assert_eq!(ActionType::Merge.to_string(), "merge");
         assert_eq!(ActionType::Split.to_string(), "split");
-        assert_eq!(
-            ActionType::Custom("test".into()).to_string(),
-            "custom:test"
-        );
+        assert_eq!(ActionType::Custom("test".into()).to_string(), "custom:test");
     }
 
     #[test]

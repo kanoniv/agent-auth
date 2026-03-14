@@ -46,7 +46,10 @@ pub enum Caveat {
 
     /// Arbitrary user-defined caveat.
     #[serde(rename = "custom")]
-    Custom { key: String, value: serde_json::Value },
+    Custom {
+        key: String,
+        value: serde_json::Value,
+    },
 }
 
 /// A cryptographic delegation of authority from one agent to another.
@@ -83,7 +86,13 @@ impl Delegation {
         caveats: Vec<Caveat>,
     ) -> Result<Self, CryptoError> {
         let issuer_identity = issuer_keypair.identity();
-        Self::create_inner(issuer_keypair, &issuer_identity.did, delegate_did, caveats, None)
+        Self::create_inner(
+            issuer_keypair,
+            &issuer_identity.did,
+            delegate_did,
+            caveats,
+            None,
+        )
     }
 
     /// Create and sign a delegated delegation (with parent chain).
@@ -128,9 +137,10 @@ impl Delegation {
         // Check chain depth limit
         if let Some(ref p) = parent {
             if p.depth() >= MAX_CHAIN_DEPTH {
-                return Err(CryptoError::DelegationChainBroken(
-                    format!("chain depth exceeds maximum of {}", MAX_CHAIN_DEPTH),
-                ));
+                return Err(CryptoError::DelegationChainBroken(format!(
+                    "chain depth exceeds maximum of {}",
+                    MAX_CHAIN_DEPTH
+                )));
             }
         }
 
@@ -287,27 +297,29 @@ pub fn verify_invocation_with_revocation(
     loop {
         steps += 1;
         if steps > MAX_CHAIN_DEPTH {
-            return Err(CryptoError::DelegationChainBroken(
-                format!("chain depth exceeds maximum of {}", MAX_CHAIN_DEPTH),
-            ));
+            return Err(CryptoError::DelegationChainBroken(format!(
+                "chain depth exceeds maximum of {}",
+                MAX_CHAIN_DEPTH
+            )));
         }
 
         chain.push(current.issuer_did.clone());
 
         // Reconstruct issuer identity from embedded public key
-        let issuer_identity = AgentIdentity::from_bytes(&current.issuer_public_key)
-            .map_err(|_| CryptoError::DelegationChainBroken(
-                format!("invalid embedded public key for '{}'", current.issuer_did),
-            ))?;
+        let issuer_identity =
+            AgentIdentity::from_bytes(&current.issuer_public_key).map_err(|_| {
+                CryptoError::DelegationChainBroken(format!(
+                    "invalid embedded public key for '{}'",
+                    current.issuer_did
+                ))
+            })?;
 
         // Verify the embedded public key matches the claimed DID
         if issuer_identity.did != current.issuer_did {
-            return Err(CryptoError::DelegationChainBroken(
-                format!(
-                    "embedded public key produces DID '{}' but delegation claims '{}'",
-                    issuer_identity.did, current.issuer_did
-                ),
-            ));
+            return Err(CryptoError::DelegationChainBroken(format!(
+                "embedded public key produces DID '{}' but delegation claims '{}'",
+                issuer_identity.did, current.issuer_did
+            )));
         }
 
         // Verify this delegation's signature using the embedded public key
@@ -341,22 +353,18 @@ pub fn verify_invocation_with_revocation(
         match &current.parent_proof {
             Some(parent) => {
                 if parent.delegate_did != current.issuer_did {
-                    return Err(CryptoError::DelegationChainBroken(
-                        format!(
-                            "delegation issuer '{}' is not the delegate of parent delegation '{}'",
-                            current.issuer_did, parent.delegate_did
-                        ),
-                    ));
+                    return Err(CryptoError::DelegationChainBroken(format!(
+                        "delegation issuer '{}' is not the delegate of parent delegation '{}'",
+                        current.issuer_did, parent.delegate_did
+                    )));
                 }
                 current = parent;
             }
             None => {
-                return Err(CryptoError::DelegationChainBroken(
-                    format!(
-                        "chain terminates at '{}', expected root '{}'",
-                        current.issuer_did, root_identity.did
-                    ),
-                ));
+                return Err(CryptoError::DelegationChainBroken(format!(
+                    "chain terminates at '{}', expected root '{}'",
+                    current.issuer_did, root_identity.did
+                )));
             }
         }
     }
@@ -399,27 +407,29 @@ pub fn verify_delegation_chain_with_revocation(
     loop {
         steps += 1;
         if steps > MAX_CHAIN_DEPTH {
-            return Err(CryptoError::DelegationChainBroken(
-                format!("chain depth exceeds maximum of {}", MAX_CHAIN_DEPTH),
-            ));
+            return Err(CryptoError::DelegationChainBroken(format!(
+                "chain depth exceeds maximum of {}",
+                MAX_CHAIN_DEPTH
+            )));
         }
 
         chain.push(current.delegate_did.clone());
         chain.push(current.issuer_did.clone());
 
         // Verify signature using embedded public key
-        let issuer_identity = AgentIdentity::from_bytes(&current.issuer_public_key)
-            .map_err(|_| CryptoError::DelegationChainBroken(
-                format!("invalid embedded public key for '{}'", current.issuer_did),
-            ))?;
+        let issuer_identity =
+            AgentIdentity::from_bytes(&current.issuer_public_key).map_err(|_| {
+                CryptoError::DelegationChainBroken(format!(
+                    "invalid embedded public key for '{}'",
+                    current.issuer_did
+                ))
+            })?;
 
         if issuer_identity.did != current.issuer_did {
-            return Err(CryptoError::DelegationChainBroken(
-                format!(
-                    "embedded public key produces DID '{}' but delegation claims '{}'",
-                    issuer_identity.did, current.issuer_did
-                ),
-            ));
+            return Err(CryptoError::DelegationChainBroken(format!(
+                "embedded public key produces DID '{}' but delegation claims '{}'",
+                issuer_identity.did, current.issuer_did
+            )));
         }
 
         current.proof.verify(&issuer_identity)?;
@@ -448,12 +458,10 @@ pub fn verify_delegation_chain_with_revocation(
                 current = parent;
             }
             None => {
-                return Err(CryptoError::DelegationChainBroken(
-                    format!(
-                        "chain terminates at '{}', expected root '{}'",
-                        current.issuer_did, root_identity.did
-                    ),
-                ));
+                return Err(CryptoError::DelegationChainBroken(format!(
+                    "chain terminates at '{}', expected root '{}'",
+                    current.issuer_did, root_identity.did
+                )));
             }
         }
     }
@@ -471,67 +479,66 @@ fn check_caveat(
     match caveat {
         Caveat::ActionScope(allowed) => {
             if !allowed.iter().any(|a| a == action) {
-                return Err(CryptoError::CaveatViolation(
-                    format!("action '{}' not in allowed scope {:?}", action, allowed),
-                ));
+                return Err(CryptoError::CaveatViolation(format!(
+                    "action '{}' not in allowed scope {:?}",
+                    action, allowed
+                )));
             }
         }
         Caveat::ExpiresAt(expiry) => {
             if now > expiry.as_str() {
+                return Err(CryptoError::CaveatViolation(format!(
+                    "delegation expired at {}",
+                    expiry
+                )));
+            }
+        }
+        Caveat::MaxCost(max) => match args.get("cost").and_then(|v| v.as_f64()) {
+            Some(cost) if cost > *max => {
+                return Err(CryptoError::CaveatViolation(format!(
+                    "cost {} exceeds max {}",
+                    cost, max
+                )));
+            }
+            None => {
                 return Err(CryptoError::CaveatViolation(
-                    format!("delegation expired at {}", expiry),
+                    "max_cost caveat requires 'cost' field in args".into(),
                 ));
             }
-        }
-        Caveat::MaxCost(max) => {
-            match args.get("cost").and_then(|v| v.as_f64()) {
-                Some(cost) if cost > *max => {
-                    return Err(CryptoError::CaveatViolation(
-                        format!("cost {} exceeds max {}", cost, max),
-                    ));
-                }
-                None => {
-                    return Err(CryptoError::CaveatViolation(
-                        "max_cost caveat requires 'cost' field in args".into(),
-                    ));
-                }
-                _ => {}
+            _ => {}
+        },
+        Caveat::Resource(pattern) => match args.get("resource").and_then(|v| v.as_str()) {
+            Some(resource) if !matches_glob(pattern, resource) => {
+                return Err(CryptoError::CaveatViolation(format!(
+                    "resource '{}' does not match pattern '{}'",
+                    resource, pattern
+                )));
             }
-        }
-        Caveat::Resource(pattern) => {
-            match args.get("resource").and_then(|v| v.as_str()) {
-                Some(resource) if !matches_glob(pattern, resource) => {
-                    return Err(CryptoError::CaveatViolation(
-                        format!("resource '{}' does not match pattern '{}'", resource, pattern),
-                    ));
-                }
-                None => {
-                    return Err(CryptoError::CaveatViolation(
-                        "resource caveat requires 'resource' field in args".into(),
-                    ));
-                }
-                _ => {}
+            None => {
+                return Err(CryptoError::CaveatViolation(
+                    "resource caveat requires 'resource' field in args".into(),
+                ));
             }
-        }
+            _ => {}
+        },
         Caveat::Context { key, value } => {
             let actual = args.get(key).and_then(|v| v.as_str());
             if actual != Some(value.as_str()) {
-                return Err(CryptoError::CaveatViolation(
-                    format!(
-                        "context '{}' expected '{}', got '{}'",
-                        key,
-                        value,
-                        actual.unwrap_or("<missing>")
-                    ),
-                ));
+                return Err(CryptoError::CaveatViolation(format!(
+                    "context '{}' expected '{}', got '{}'",
+                    key,
+                    value,
+                    actual.unwrap_or("<missing>")
+                )));
             }
         }
         Caveat::Custom { key, value } => {
             let actual = args.get(key);
             if actual != Some(value) {
-                return Err(CryptoError::CaveatViolation(
-                    format!("custom caveat '{}' not satisfied", key),
-                ));
+                return Err(CryptoError::CaveatViolation(format!(
+                    "custom caveat '{}' not satisfied",
+                    key
+                )));
             }
         }
     }
@@ -610,20 +617,10 @@ mod tests {
         let agent_c = keypair();
         let unrelated = keypair();
 
-        let d1 = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let d1 = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
         // Agent C tries to delegate using Agent B's delegation (but C is not B)
-        let result = Delegation::delegate(
-            &unrelated,
-            &agent_c.identity().did,
-            vec![],
-            d1,
-        );
+        let result = Delegation::delegate(&unrelated, &agent_c.identity().did, vec![], d1);
         assert!(result.is_err());
     }
 
@@ -659,20 +656,10 @@ mod tests {
         let agent_b = keypair();
         let agent_c = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let delegation = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
         // Agent C tries to invoke using Agent B's delegation
-        let result = Invocation::create(
-            &agent_c,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        );
+        let result = Invocation::create(&agent_c, "resolve", serde_json::json!({}), delegation);
         assert!(result.is_err());
     }
 
@@ -690,20 +677,10 @@ mod tests {
         )
         .unwrap();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
-        let result = verify_invocation(
-            &invocation,
-            &agent_b.identity(),
-            &root.identity(),
-        )
-        .unwrap();
+        let result = verify_invocation(&invocation, &agent_b.identity(), &root.identity()).unwrap();
 
         assert_eq!(result.invoker_did, agent_b.identity().did);
         assert_eq!(result.root_did, root.identity().did);
@@ -731,20 +708,10 @@ mod tests {
         )
         .unwrap();
 
-        let invocation = Invocation::create(
-            &agent_c,
-            "resolve",
-            serde_json::json!({}),
-            d2,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_c, "resolve", serde_json::json!({}), d2).unwrap();
 
-        let result = verify_invocation(
-            &invocation,
-            &agent_c.identity(),
-            &root.identity(),
-        )
-        .unwrap();
+        let result = verify_invocation(&invocation, &agent_c.identity(), &root.identity()).unwrap();
 
         assert_eq!(result.invoker_did, agent_c.identity().did);
         assert_eq!(result.root_did, root.identity().did);
@@ -757,26 +724,12 @@ mod tests {
         let agent_b = keypair();
         let fake_root = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let delegation = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
-        let result = verify_invocation(
-            &invocation,
-            &agent_b.identity(),
-            &fake_root.identity(),
-        );
+        let result = verify_invocation(&invocation, &agent_b.identity(), &fake_root.identity());
         assert!(result.is_err());
     }
 
@@ -794,13 +747,8 @@ mod tests {
         )
         .unwrap();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         assert!(verify_invocation(&invocation, &agent_b.identity(), &root.identity()).is_ok());
     }
@@ -841,13 +789,8 @@ mod tests {
         )
         .unwrap();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         let result = verify_invocation(&invocation, &agent_b.identity(), &root.identity());
         assert!(matches!(result, Err(CryptoError::CaveatViolation(_))));
@@ -858,12 +801,9 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![Caveat::MaxCost(5.0)],
-        )
-        .unwrap();
+        let delegation =
+            Delegation::create_root(&root, &agent_b.identity().did, vec![Caveat::MaxCost(5.0)])
+                .unwrap();
 
         let invocation = Invocation::create(
             &agent_b,
@@ -881,12 +821,9 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![Caveat::MaxCost(5.0)],
-        )
-        .unwrap();
+        let delegation =
+            Delegation::create_root(&root, &agent_b.identity().did, vec![Caveat::MaxCost(5.0)])
+                .unwrap();
 
         let invocation = Invocation::create(
             &agent_b,
@@ -997,13 +934,7 @@ mod tests {
         .unwrap();
 
         // C tries to search - blocked by C's caveat
-        let inv = Invocation::create(
-            &agent_c,
-            "search",
-            serde_json::json!({}),
-            d2,
-        )
-        .unwrap();
+        let inv = Invocation::create(&agent_c, "search", serde_json::json!({}), d2).unwrap();
 
         let result = verify_invocation(&inv, &agent_c.identity(), &root.identity());
         assert!(matches!(result, Err(CryptoError::CaveatViolation(_))));
@@ -1023,29 +954,11 @@ mod tests {
         )
         .unwrap();
 
-        let d2 = Delegation::delegate(
-            &agent_b,
-            &agent_c.identity().did,
-            vec![],
-            d1,
-        )
-        .unwrap();
+        let d2 = Delegation::delegate(&agent_b, &agent_c.identity().did, vec![], d1).unwrap();
 
-        let d3 = Delegation::delegate(
-            &agent_c,
-            &agent_d.identity().did,
-            vec![],
-            d2,
-        )
-        .unwrap();
+        let d3 = Delegation::delegate(&agent_c, &agent_d.identity().did, vec![], d2).unwrap();
 
-        let inv = Invocation::create(
-            &agent_d,
-            "resolve",
-            serde_json::json!({}),
-            d3,
-        )
-        .unwrap();
+        let inv = Invocation::create(&agent_d, "resolve", serde_json::json!({}), d3).unwrap();
 
         let result = verify_invocation(&inv, &agent_d.identity(), &root.identity()).unwrap();
         assert_eq!(result.depth, 3); // D -> C -> B -> root
@@ -1057,20 +970,9 @@ mod tests {
         let agent_b = keypair();
         let agent_c = keypair();
 
-        let d1 = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let d1 = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
-        let d2 = Delegation::delegate(
-            &agent_b,
-            &agent_c.identity().did,
-            vec![],
-            d1,
-        )
-        .unwrap();
+        let d2 = Delegation::delegate(&agent_b, &agent_c.identity().did, vec![], d1).unwrap();
 
         let chain = verify_delegation_chain(&d2, &root.identity()).unwrap();
         assert!(chain.contains(&root.identity().did));
@@ -1108,8 +1010,14 @@ mod tests {
             Caveat::ExpiresAt("2030-01-01T00:00:00.000Z".into()),
             Caveat::MaxCost(5.0),
             Caveat::Resource("entity:*".into()),
-            Caveat::Context { key: "task_id".into(), value: "t1".into() },
-            Caveat::Custom { key: "org".into(), value: serde_json::json!("acme") },
+            Caveat::Context {
+                key: "task_id".into(),
+                value: "t1".into(),
+            },
+            Caveat::Custom {
+                key: "org".into(),
+                value: serde_json::json!("acme"),
+            },
         ];
 
         for caveat in &caveats {
@@ -1134,21 +1042,13 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![Caveat::MaxCost(5.0)],
-        )
-        .unwrap();
+        let delegation =
+            Delegation::create_root(&root, &agent_b.identity().did, vec![Caveat::MaxCost(5.0)])
+                .unwrap();
 
         // No cost field in args - should fail (not silently pass)
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         let result = verify_invocation(&invocation, &agent_b.identity(), &root.identity());
         assert!(matches!(result, Err(CryptoError::CaveatViolation(_))));
@@ -1167,13 +1067,8 @@ mod tests {
         .unwrap();
 
         // No resource field in args - should fail
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         let result = verify_invocation(&invocation, &agent_b.identity(), &root.identity());
         assert!(matches!(result, Err(CryptoError::CaveatViolation(_))));
@@ -1184,14 +1079,12 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let delegation = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
-        assert_eq!(delegation.issuer_public_key, root.identity().public_key_bytes);
+        assert_eq!(
+            delegation.issuer_public_key,
+            root.identity().public_key_bytes
+        );
     }
 
     #[test]
@@ -1209,13 +1102,8 @@ mod tests {
         // Tamper with outer caveats to widen scope
         delegation.caveats = vec![Caveat::ActionScope(vec!["resolve".into(), "merge".into()])];
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "merge",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "merge", serde_json::json!({}), delegation).unwrap();
 
         // Should fail because verification reads caveats from signed payload,
         // not from the tampered outer field
@@ -1236,24 +1124,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut d2 = Delegation::delegate(
-            &agent_b,
-            &agent_c.identity().did,
-            vec![],
-            d1,
-        )
-        .unwrap();
+        let mut d2 = Delegation::delegate(&agent_b, &agent_c.identity().did, vec![], d1).unwrap();
 
         // Tamper with d2's proof signature (corrupt it)
         d2.proof.signature = "00".repeat(64);
 
-        let invocation = Invocation::create(
-            &agent_c,
-            "resolve",
-            serde_json::json!({}),
-            d2,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_c, "resolve", serde_json::json!({}), d2).unwrap();
 
         // Should fail because B's delegation signature is now verified
         let result = verify_invocation(&invocation, &agent_c.identity(), &root.identity());
@@ -1267,22 +1144,12 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let delegation = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
         let revoked_hash = delegation.proof.content_hash();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Without revocation - passes
         assert!(verify_invocation(&invocation, &agent_b.identity(), &root.identity()).is_ok());
@@ -1303,30 +1170,14 @@ mod tests {
         let agent_b = keypair();
         let agent_c = keypair();
 
-        let d1 = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let d1 = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
         let revoked_hash = d1.proof.content_hash();
 
-        let d2 = Delegation::delegate(
-            &agent_b,
-            &agent_c.identity().did,
-            vec![],
-            d1,
-        )
-        .unwrap();
+        let d2 = Delegation::delegate(&agent_b, &agent_c.identity().did, vec![], d1).unwrap();
 
-        let invocation = Invocation::create(
-            &agent_c,
-            "resolve",
-            serde_json::json!({}),
-            d2,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_c, "resolve", serde_json::json!({}), d2).unwrap();
 
         // Revoking the root delegation blocks the entire chain
         let result = verify_invocation_with_revocation(
@@ -1343,20 +1194,10 @@ mod tests {
         let root = keypair();
         let agent_b = keypair();
 
-        let delegation = Delegation::create_root(
-            &root,
-            &agent_b.identity().did,
-            vec![],
-        )
-        .unwrap();
+        let delegation = Delegation::create_root(&root, &agent_b.identity().did, vec![]).unwrap();
 
-        let invocation = Invocation::create(
-            &agent_b,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let invocation =
+            Invocation::create(&agent_b, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Default (no revocation) always passes
         let result = verify_invocation_with_revocation(

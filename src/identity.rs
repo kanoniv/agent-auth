@@ -40,7 +40,11 @@ pub struct ServiceEndpoint {
 
 impl ServiceEndpoint {
     /// Create a new service endpoint.
-    pub fn new(id: impl Into<String>, service_type: impl Into<String>, endpoint: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        service_type: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             service_type: service_type.into(),
@@ -95,7 +99,9 @@ impl AgentKeyPair {
     /// Derive the public identity from this keypair.
     pub fn identity(&self) -> AgentIdentity {
         let verifying_key = self.signing_key.verifying_key();
-        let ts = self.created_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let ts = self
+            .created_at
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         AgentIdentity::from_public_key_with_created_at(&verifying_key, Some(ts))
     }
 
@@ -137,9 +143,11 @@ impl AgentIdentity {
 
     /// Get the Ed25519 verifying key for signature verification.
     pub fn verifying_key(&self) -> Result<VerifyingKey, CryptoError> {
-        let bytes: [u8; 32] = self.public_key_bytes.clone().try_into().map_err(|_| {
-            CryptoError::InvalidKeyLength(self.public_key_bytes.len())
-        })?;
+        let bytes: [u8; 32] = self
+            .public_key_bytes
+            .clone()
+            .try_into()
+            .map_err(|_| CryptoError::InvalidKeyLength(self.public_key_bytes.len()))?;
         VerifyingKey::from_bytes(&bytes).map_err(|_| CryptoError::InvalidPublicKey)
     }
 
@@ -219,18 +227,17 @@ impl AgentIdentity {
     ///
     /// Expects format: z{base58btc(0xed01 + 32_bytes)}
     pub fn from_multibase(multibase: &str) -> Result<Self, CryptoError> {
-        let stripped = multibase.strip_prefix('z')
-            .ok_or_else(|| CryptoError::InvalidSignatureEncoding(
-                "multibase must start with 'z' (base58btc)".into()
-            ))?;
-        let decoded = bs58::decode(stripped)
-            .into_vec()
-            .map_err(|e| CryptoError::InvalidSignatureEncoding(
-                format!("invalid base58btc: {}", e)
-            ))?;
+        let stripped = multibase.strip_prefix('z').ok_or_else(|| {
+            CryptoError::InvalidSignatureEncoding(
+                "multibase must start with 'z' (base58btc)".into(),
+            )
+        })?;
+        let decoded = bs58::decode(stripped).into_vec().map_err(|e| {
+            CryptoError::InvalidSignatureEncoding(format!("invalid base58btc: {}", e))
+        })?;
         if decoded.len() != 34 || decoded[0] != 0xed || decoded[1] != 0x01 {
             return Err(CryptoError::InvalidSignatureEncoding(
-                "expected ed25519-pub multicodec prefix (0xed01) + 32 bytes".into()
+                "expected ed25519-pub multicodec prefix (0xed01) + 32 bytes".into(),
             ));
         }
         Self::from_bytes(&decoded[2..])
@@ -421,10 +428,7 @@ mod tests {
         let doc = identity.did_document();
 
         let expected_key_ref = format!("{}#key-1", identity.did);
-        assert_eq!(
-            doc["authentication"][0].as_str().unwrap(),
-            expected_key_ref
-        );
+        assert_eq!(doc["authentication"][0].as_str().unwrap(), expected_key_ref);
         assert_eq!(
             doc["assertionMethod"][0].as_str().unwrap(),
             expected_key_ref
@@ -465,8 +469,16 @@ mod tests {
         let kp = AgentKeyPair::generate();
         let identity = kp.identity();
         let services = vec![
-            ServiceEndpoint::new("#messaging", "AgentMessaging", "https://example.com/agent/msg"),
-            ServiceEndpoint::new("#resolve", "KanonivResolve", "https://api.kanoniv.com/v1/resolve"),
+            ServiceEndpoint::new(
+                "#messaging",
+                "AgentMessaging",
+                "https://example.com/agent/msg",
+            ),
+            ServiceEndpoint::new(
+                "#resolve",
+                "KanonivResolve",
+                "https://api.kanoniv.com/v1/resolve",
+            ),
         ];
         let doc = identity.did_document_with_services(&services);
 
@@ -495,13 +507,11 @@ mod tests {
     fn test_did_document_with_full_uri_service_id() {
         let kp = AgentKeyPair::generate();
         let identity = kp.identity();
-        let services = vec![
-            ServiceEndpoint::new(
-                "https://example.com/services/agent-1",
-                "AgentMessaging",
-                "https://example.com/agent/msg",
-            ),
-        ];
+        let services = vec![ServiceEndpoint::new(
+            "https://example.com/services/agent-1",
+            "AgentMessaging",
+            "https://example.com/agent/msg",
+        )];
         let doc = identity.did_document_with_services(&services);
 
         let svc = doc["service"].as_array().unwrap();

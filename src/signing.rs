@@ -30,10 +30,7 @@ pub struct SignedMessage {
 
 impl SignedMessage {
     /// Sign a payload with the given keypair.
-    pub fn sign(
-        keypair: &AgentKeyPair,
-        payload: serde_json::Value,
-    ) -> Result<Self, CryptoError> {
+    pub fn sign(keypair: &AgentKeyPair, payload: serde_json::Value) -> Result<Self, CryptoError> {
         let identity = keypair.identity();
         let nonce = uuid::Uuid::new_v4().to_string();
         let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -60,11 +57,17 @@ impl SignedMessage {
         }
 
         let verifying_key = identity.verifying_key()?;
-        let canonical = canonical_bytes(&self.payload, &self.signer_did, &self.nonce, &self.timestamp)?;
+        let canonical = canonical_bytes(
+            &self.payload,
+            &self.signer_did,
+            &self.nonce,
+            &self.timestamp,
+        )?;
 
         let sig_bytes = hex::decode(&self.signature)
             .map_err(|e| CryptoError::InvalidSignatureEncoding(e.to_string()))?;
-        let sig_array: [u8; 64] = sig_bytes.try_into()
+        let sig_array: [u8; 64] = sig_bytes
+            .try_into()
             .map_err(|_| CryptoError::InvalidSignatureEncoding("expected 64 bytes".into()))?;
         let signature = ed25519_dalek::Signature::from_bytes(&sig_array);
 
@@ -106,8 +109,7 @@ pub(crate) fn canonical_bytes(
     map.insert("signer_did", serde_json::json!(signer_did));
     map.insert("timestamp", serde_json::json!(timestamp));
 
-    serde_json::to_vec(&map)
-        .map_err(|e| CryptoError::SerializationError(e.to_string()))
+    serde_json::to_vec(&map).map_err(|e| CryptoError::SerializationError(e.to_string()))
 }
 
 #[cfg(test)]
