@@ -253,9 +253,37 @@ All implementations MUST:
 - **TypeScript**: Construct JSON string by concatenating keys in order (do NOT use `JSON.stringify` on an object, as key order is implementation-dependent for integer keys)
 - **Python**: Use `collections.OrderedDict` or manually construct the JSON string
 
-## 7. Security Considerations
+## 7. DID Method Operations
+
+### 7.1 Create
+
+Generate a new Ed25519 keypair. The DID is deterministically derived from the public key per Section 3.1. No registration with any external system is required. The DID exists the moment the key is generated.
+
+### 7.2 Read (Resolve)
+
+Given a `did:agent:` identifier, resolution requires the public key bytes. The DID Document is constructed locally per Section 3.2. There is no global resolver - the public key must be obtained through a prior exchange (e.g. embedded in a Delegation, included in a signed message, or published at a known endpoint via the service endpoints in the DID Document).
+
+### 7.3 Update
+
+DID Documents are derived from the public key and optional parameters (service endpoints, creation timestamp). Updating a DID Document means changing these parameters. Since the DID is bound to the public key, the DID itself cannot change. Key rotation requires creating a new DID.
+
+### 7.4 Deactivate
+
+A `did:agent:` identifier is deactivated by destroying the corresponding secret key. There is no on-chain deactivation. For delegation-based systems, the revocation hook (`is_revoked` callback) allows revoking specific delegations without deactivating the identity.
+
+## 8. Security Considerations
 
 - **Nonce reuse**: Each signed message MUST use a fresh UUID v4 nonce. Reusing nonces enables replay attacks.
 - **Timestamp drift**: Verifiers MAY reject messages with timestamps too far in the past or future. The signed envelope format includes the timestamp for this purpose, but enforcement is application-specific.
 - **Key storage**: Secret keys MUST be stored securely. This specification does not mandate a storage mechanism.
 - **DID collision**: The 128-bit truncation provides adequate collision resistance for practical use (birthday bound at ~2^64 identities).
+- **No key rotation**: The DID is permanently bound to the public key. Key compromise means identity compromise. Agents SHOULD use the `created_at` field to enforce key freshness policies.
+- **Delegation chain depth**: Implementations MUST enforce a maximum chain depth (recommended: 32) to prevent denial-of-service via deeply nested chains.
+- **Intermediate signature verification**: Implementations MUST verify every signature in a delegation chain, not just the root and leaf. Embedded issuer public keys enable this without external key resolution.
+
+## 9. Privacy Considerations
+
+- **Correlation**: A `did:agent:` identifier is a persistent pseudonym. Any party that observes the same DID across interactions can correlate them. Agents that require unlinkability SHOULD generate a new keypair per interaction context.
+- **Public key exposure**: The DID is derived from the public key hash, not the public key itself. However, the DID Document and signed messages expose the full public key. This is by design - the public key is needed for verification.
+- **No phone-home**: DID resolution is entirely local. There is no registry, ledger, or resolver service that learns when a DID is used. This is a privacy advantage over DID methods that require network resolution.
+- **Delegation metadata**: Delegation chains expose the authority structure (who delegated to whom). This is intentional for auditability but may reveal organizational relationships. Agents SHOULD consider whether the delegation chain itself is sensitive.
