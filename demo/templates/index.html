@@ -97,6 +97,46 @@
         .msg-judge-feasibility { border-left: 3px solid var(--warning); }
         .msg-judge-ethics { border-left: 3px solid var(--relationship); }
 
+        /* Hospital agent colors */
+        .dot-physician { background: #FF6B6B !important; }
+        .dot-orchestrator { background: var(--gold) !important; }
+        .dot-diagnostic { background: var(--info) !important; }
+        .dot-treatment { background: var(--success) !important; }
+        .dot-discharge { background: var(--relationship) !important; }
+        .color-physician { color: #FF6B6B !important; }
+        .color-orchestrator { color: var(--gold) !important; }
+        .color-diagnostic { color: var(--info) !important; }
+        .color-treatment { color: var(--success) !important; }
+        .color-discharge { color: var(--relationship) !important; }
+        .msg-physician { border-left: 3px solid #FF6B6B; }
+        .msg-orchestrator { border-left: 3px solid var(--gold); }
+        .msg-diagnostic { border-left: 3px solid var(--info); }
+        .msg-treatment { border-left: 3px solid var(--success); }
+        .msg-discharge { border-left: 3px solid var(--relationship); }
+
+        /* Delegation cards */
+        .deleg-card {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 10px 12px; margin-top: 4px;
+        }
+        .deleg-verified { border-left: 3px solid var(--success); }
+        .deleg-denied { border-left: 3px solid var(--danger); }
+        .deleg-revoked { border-left: 3px solid var(--warning); }
+        .deleg-created { border-left: 3px solid var(--gold); }
+        .deleg-status {
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 4px;
+        }
+        .deleg-chain {
+            font-size: 10px; font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-secondary); margin-top: 4px;
+        }
+        .deleg-caveat {
+            display: inline-block; font-size: 9px; padding: 1px 6px;
+            background: var(--gold-10); color: var(--gold); border-radius: 3px;
+            margin: 2px 2px 0 0;
+        }
+
         /* === Layout === */
         .main {
             display: grid; grid-template-columns: 260px 1fr 340px;
@@ -398,7 +438,8 @@
         </div>
         <div class="header-actions">
             <div style="display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px">
-                <button class="mode-btn{% if mode != 'debate' %} active{% endif %}" onclick="switchMode('build')" id="mode-build">Build</button>
+                <button class="mode-btn{% if mode == 'hospital' %} active{% endif %}" onclick="switchMode('hospital')" id="mode-hospital">Hospital</button>
+                <button class="mode-btn{% if mode == 'build' %} active{% endif %}" onclick="switchMode('build')" id="mode-build">Build</button>
                 <button class="mode-btn{% if mode == 'debate' %} active{% endif %}" onclick="switchMode('debate')" id="mode-debate">Debate</button>
             </div>
             <button class="btn-secondary" onclick="discoverAgents()">Discover Agents</button>
@@ -437,14 +478,14 @@
                 <div class="empty-state" id="empty-state">
                     <div class="empty-icon">◆</div>
                     <div class="empty-title">No activity yet</div>
-                    <div class="empty-desc">{% if mode == 'debate' %}Enter a debate topic below to start the agent debate{% else %}Enter a request below to start the multi-agent workflow{% endif %}</div>
+                    <div class="empty-desc">{% if mode == 'hospital' %}Enter a patient case to start the hospital delegation demo{% elif mode == 'debate' %}Enter a debate topic below to start the agent debate{% else %}Enter a request below to start the multi-agent workflow{% endif %}</div>
                 </div>
             </div>
             <div class="chat-input">
                 <input type="text" id="request-input"
-                       placeholder="{% if mode == 'debate' %}e.g. AI will replace most jobs within 10 years{% else %}e.g. Build a weather dashboard with live temperature{% endif %}"
+                       placeholder="{% if mode == 'hospital' %}e.g. 55-year-old male with acute chest pain and shortness of breath{% elif mode == 'debate' %}e.g. AI will replace most jobs within 10 years{% else %}e.g. Build a weather dashboard with live temperature{% endif %}"
                        onkeydown="if(event.key==='Enter')runTask()">
-                <button class="btn-primary" id="run-btn" onclick="runTask()">{% if mode == 'debate' %}Debate{% else %}Run{% endif %}</button>
+                <button class="btn-primary" id="run-btn" onclick="runTask()">{% if mode == 'hospital' %}Start Case{% elif mode == 'debate' %}Debate{% else %}Run{% endif %}</button>
             </div>
         </div>
 
@@ -909,7 +950,10 @@
             builder: "var(--success)", verifier: "var(--gold)",
             moderator: "var(--gold)", advocate: "var(--success)",
             critic: "var(--danger)", "judge-logic": "var(--info)",
-            "judge-feasibility": "var(--warning)", "judge-ethics": "var(--relationship)"
+            "judge-feasibility": "var(--warning)", "judge-ethics": "var(--relationship)",
+            physician: "#FF6B6B", orchestrator: "var(--gold)",
+            diagnostic: "var(--info)", treatment: "var(--success)",
+            discharge: "var(--relationship)"
         };
         // Build DID→name map from page data
         const didNameMap = {};
@@ -971,6 +1015,78 @@
             btn.textContent = el.classList.contains("open") ? "Collapse" : "Expand";
         }
 
+        // === Delegation Cards (Hospital Mode) ===
+        function addDelegationCard(agent, type, message, info) {
+            document.getElementById("empty-state")?.remove();
+            const div = document.createElement("div");
+            div.className = "msg msg-" + agent;
+
+            if (!info) {
+                // Fallback: render as normal message
+                addMessage(agent, "status", message, {});
+                return;
+            }
+
+            const status = (info.status || "").toUpperCase();
+            let cardClass = "deleg-created";
+            let statusColor = "var(--gold)";
+            let statusIcon = "&#9670;"; // diamond
+
+            if (status === "VERIFIED") {
+                cardClass = "deleg-verified";
+                statusColor = "var(--success)";
+                statusIcon = "&#10003;"; // checkmark
+            } else if (status === "DENIED") {
+                cardClass = "deleg-denied";
+                statusColor = "var(--danger)";
+                statusIcon = "&#10007;"; // X
+            } else if (status === "REVOKED") {
+                cardClass = "deleg-revoked";
+                statusColor = "var(--warning)";
+                statusIcon = "&#9888;"; // warning
+            }
+
+            let chainHtml = "";
+            if (info.chain && info.chain.length > 0) {
+                const chainStr = info.chain.map(d => d.substring(0, 16) + "...").join(" &rarr; ");
+                chainHtml = '<div class="deleg-chain">' + chainStr + '</div>';
+            }
+
+            let caveatsHtml = "";
+            if (info.caveats && info.caveats.length > 0) {
+                caveatsHtml = '<div style="margin-top:4px">' +
+                    info.caveats.map(c => '<span class="deleg-caveat">' + escapeHtml(c) + '</span>').join("") +
+                    '</div>';
+            }
+
+            let reasonHtml = "";
+            if (info.reason) {
+                reasonHtml = '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + escapeHtml(info.reason) + '</div>';
+            }
+
+            div.innerHTML =
+                '<div class="msg-header">' +
+                    '<span class="agent-dot dot-' + agent + '"></span>' +
+                    '<span class="msg-agent color-' + agent + '">' + agent + '</span>' +
+                    '<span class="msg-type">' + type.replace("_", " ") + '</span>' +
+                '</div>' +
+                '<div class="deleg-card ' + cardClass + '">' +
+                    '<div class="deleg-status" style="color:' + statusColor + '">' +
+                        statusIcon + ' ' + status +
+                        (info.action ? ' &mdash; ' + escapeHtml(info.action) : '') +
+                    '</div>' +
+                    '<div style="font-size:12px;line-height:1.5">' + escapeHtml(message) + '</div>' +
+                    chainHtml +
+                    caveatsHtml +
+                    reasonHtml +
+                '</div>';
+
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            messageCount++;
+            document.getElementById("msg-count").textContent = messageCount + " messages";
+        }
+
         function escapeHtml(text) {
             const d = document.createElement("div");
             d.textContent = text;
@@ -1008,7 +1124,7 @@
                     source.close();
                     runBtn.disabled = false;
                     inputEl.disabled = false;
-                    runBtn.textContent = currentMode === "debate" ? "Debate" : "Run";
+                    runBtn.textContent = currentMode === "hospital" ? "Start Case" : currentMode === "debate" ? "Debate" : "Run";
                     inputEl.focus();
                     return;
                 }
@@ -1040,6 +1156,12 @@
                         graphData = prov;
                     }
                     addMessage(ev.agent, "status", ev.message, ev.details);
+                    return;
+                }
+
+                // Handle delegation events (hospital mode)
+                if (ev.type === "delegation" || ev.type === "delegation_check") {
+                    addDelegationCard(ev.agent, ev.type, ev.message, ev.delegation_info || ev.details);
                     return;
                 }
 
