@@ -1,10 +1,14 @@
 {
   "name": "@kanoniv/agent-auth",
-  "version": "0.2.0",
-  "description": "Cryptographic identity primitives for AI agents - Ed25519 keypairs, DIDs, signed envelopes, and provenance entries",
+  "version": "0.3.0",
+  "description": "Cryptographic identity and delegation for AI agents - Ed25519 keypairs, DIDs, delegation chains, MCP auth",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "kanoniv-agent-auth": "dist/cli.js",
+    "agent-auth": "dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
