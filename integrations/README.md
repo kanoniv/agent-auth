@@ -4,6 +4,15 @@ Drop-in delegation for popular agent frameworks. Each integration adds cryptogra
 
 ## Available Integrations
 
+### MCP SDK Middleware (one-line auth for MCP servers)
+
+| SDK | File | Pattern | What it adds |
+|-----|------|---------|-------------|
+| [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) | `mcp-sdk-typescript/` | `withDelegationAuth(server, opts)` | Patches `registerTool()` to auto-verify delegation proofs |
+| [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | `mcp_sdk_python.py` | `with_delegation_auth(mcp, key)` | Patches `@mcp.tool()` to auto-verify delegation proofs |
+
+### Agent Framework Integrations
+
 | Framework | File | Key Class | What it adds |
 |-----------|------|-----------|-------------|
 | [CrewAI](https://crewai.com) | `crewai_auth.py` | `DelegatedCrewManager` | Human delegates to crew, crew sub-delegates to agents with narrower caveats |
