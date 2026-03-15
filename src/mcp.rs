@@ -332,8 +332,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let proof = McpProof::create(
             &agent,
@@ -385,16 +384,9 @@ mod tests {
         let agent = keypair();
         let impersonator = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Tamper: replace invoker public key with impersonator's
         let tampered = McpProof {
@@ -412,16 +404,9 @@ mod tests {
         let fake_root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         let result = verify_mcp_call(&proof, &fake_root.identity());
         assert!(result.is_err());
@@ -505,13 +490,7 @@ mod tests {
         )
         .unwrap();
 
-        let proof = McpProof::create(
-            &worker,
-            "resolve",
-            serde_json::json!({}),
-            d2,
-        )
-        .unwrap();
+        let proof = McpProof::create(&worker, "resolve", serde_json::json!({}), d2).unwrap();
 
         let result = verify_mcp_call(&proof, &root.identity()).unwrap();
         assert_eq!(result.invoker_did, worker.identity().did);
@@ -524,27 +503,17 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
         let revoked_hash = delegation.proof.content_hash();
 
-        let proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Without revocation - passes
         assert!(verify_mcp_call(&proof, &root.identity()).is_ok());
 
         // With revocation - fails
-        let result = verify_mcp_call_with_revocation(
-            &proof,
-            &root.identity(),
-            |hash| hash == revoked_hash,
-        );
+        let result =
+            verify_mcp_call_with_revocation(&proof, &root.identity(), |hash| hash == revoked_hash);
         assert!(matches!(result, Err(CryptoError::DelegationRevoked(_))));
     }
 
@@ -555,7 +524,8 @@ mod tests {
         let root = keypair();
         let args = serde_json::json!({"source": "crm"});
 
-        let result = verify_mcp_tool_call("resolve", &args, &root.identity(), McpAuthMode::Required);
+        let result =
+            verify_mcp_tool_call("resolve", &args, &root.identity(), McpAuthMode::Required);
         assert!(matches!(result, Err(CryptoError::DelegationChainBroken(_))));
     }
 
@@ -564,8 +534,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let proof = McpProof::create(
             &agent,
@@ -601,8 +570,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let proof = McpProof::create(
             &agent,
@@ -626,8 +594,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let proof = McpProof::create(
             &agent,
@@ -651,13 +618,28 @@ mod tests {
 
     #[test]
     fn test_auth_mode_from_str() {
-        assert_eq!(McpAuthMode::from_str_lossy("required"), McpAuthMode::Required);
-        assert_eq!(McpAuthMode::from_str_lossy("enforce"), McpAuthMode::Required);
+        assert_eq!(
+            McpAuthMode::from_str_lossy("required"),
+            McpAuthMode::Required
+        );
+        assert_eq!(
+            McpAuthMode::from_str_lossy("enforce"),
+            McpAuthMode::Required
+        );
         assert_eq!(McpAuthMode::from_str_lossy("strict"), McpAuthMode::Required);
-        assert_eq!(McpAuthMode::from_str_lossy("disabled"), McpAuthMode::Disabled);
+        assert_eq!(
+            McpAuthMode::from_str_lossy("disabled"),
+            McpAuthMode::Disabled
+        );
         assert_eq!(McpAuthMode::from_str_lossy("off"), McpAuthMode::Disabled);
-        assert_eq!(McpAuthMode::from_str_lossy("optional"), McpAuthMode::Optional);
-        assert_eq!(McpAuthMode::from_str_lossy("anything"), McpAuthMode::Optional);
+        assert_eq!(
+            McpAuthMode::from_str_lossy("optional"),
+            McpAuthMode::Optional
+        );
+        assert_eq!(
+            McpAuthMode::from_str_lossy("anything"),
+            McpAuthMode::Optional
+        );
     }
 
     // --- Error path tests ---
@@ -668,16 +650,10 @@ mod tests {
         let agent = keypair();
         let wrong_agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         // wrong_agent is not the delegate of this delegation
-        let result = McpProof::create(
-            &wrong_agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        );
+        let result = McpProof::create(&wrong_agent, "resolve", serde_json::json!({}), delegation);
         assert!(result.is_err());
     }
 
@@ -686,16 +662,10 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let mut proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let mut proof =
+            McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Replace with invalid hex
         proof.invoker_public_key = "not-valid-hex!@#$".to_string();
@@ -712,16 +682,10 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let mut proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let mut proof =
+            McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Replace with valid hex but wrong length (16 bytes instead of 32)
         proof.invoker_public_key = hex::encode(&[0u8; 16]);
@@ -738,22 +702,19 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let mut proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let mut proof =
+            McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Tamper with the invocation signature
         proof.invocation.proof.signature = "00".repeat(64);
 
         let result = verify_mcp_call(&proof, &root.identity());
-        assert!(result.is_err(), "tampered signature should fail verification");
+        assert!(
+            result.is_err(),
+            "tampered signature should fail verification"
+        );
     }
 
     #[test]
@@ -761,20 +722,16 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
-        let proof = McpProof::create(
-            &agent,
-            "resolve",
-            serde_json::json!({}),
-            delegation,
-        )
-        .unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // Ed25519 public key = 32 bytes = 64 hex chars
         assert_eq!(proof.invoker_public_key.len(), 64);
-        assert!(proof.invoker_public_key.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(proof
+            .invoker_public_key
+            .chars()
+            .all(|c| c.is_ascii_hexdigit()));
     }
 
     // --- extract() edge cases ---
@@ -838,11 +795,8 @@ mod tests {
     fn test_inject_non_object_is_noop() {
         let root = keypair();
         let agent = keypair();
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
-        let proof = McpProof::create(
-            &agent, "resolve", serde_json::json!({}), delegation,
-        ).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         // inject on non-object should be a no-op
         let mut arr = serde_json::json!([1, 2, 3]);
@@ -861,8 +815,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let mut proof = McpProof::create(
             &agent,
@@ -878,10 +831,12 @@ mod tests {
         let mut args = serde_json::json!({"source": "crm"});
         proof.inject(&mut args);
 
-        let result = verify_mcp_tool_call(
-            "resolve", &args, &root.identity(), McpAuthMode::Required,
+        let result =
+            verify_mcp_tool_call("resolve", &args, &root.identity(), McpAuthMode::Required);
+        assert!(
+            result.is_err(),
+            "invalid proof in required mode should fail"
         );
-        assert!(result.is_err(), "invalid proof in required mode should fail");
     }
 
     #[test]
@@ -889,8 +844,7 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation =
-            Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let mut proof = McpProof::create(
             &agent,
@@ -907,10 +861,12 @@ mod tests {
         proof.inject(&mut args);
 
         // Optional mode: if proof IS present but invalid, should still fail
-        let result = verify_mcp_tool_call(
-            "resolve", &args, &root.identity(), McpAuthMode::Optional,
+        let result =
+            verify_mcp_tool_call("resolve", &args, &root.identity(), McpAuthMode::Optional);
+        assert!(
+            result.is_err(),
+            "invalid proof in optional mode should fail (proof was present)"
         );
-        assert!(result.is_err(), "invalid proof in optional mode should fail (proof was present)");
     }
 
     // --- Caveat types through MCP ---
@@ -928,9 +884,7 @@ mod tests {
         )
         .unwrap();
 
-        let proof = McpProof::create(
-            &agent, "resolve", serde_json::json!({}), delegation,
-        ).unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         assert!(matches!(
             verify_mcp_call(&proof, &root.identity()),
@@ -950,9 +904,7 @@ mod tests {
         )
         .unwrap();
 
-        let proof = McpProof::create(
-            &agent, "resolve", serde_json::json!({}), delegation,
-        ).unwrap();
+        let proof = McpProof::create(&agent, "resolve", serde_json::json!({}), delegation).unwrap();
 
         assert!(verify_mcp_call(&proof, &root.identity()).is_ok());
     }
@@ -971,18 +923,22 @@ mod tests {
 
         // Matching resource
         let proof_ok = McpProof::create(
-            &agent, "resolve",
+            &agent,
+            "resolve",
             serde_json::json!({"resource": "entity:customer:123"}),
             delegation.clone(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(verify_mcp_call(&proof_ok, &root.identity()).is_ok());
 
         // Non-matching resource
         let proof_bad = McpProof::create(
-            &agent, "resolve",
+            &agent,
+            "resolve",
             serde_json::json!({"resource": "entity:order:456"}),
             delegation,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(matches!(
             verify_mcp_call(&proof_bad, &root.identity()),
             Err(CryptoError::CaveatViolation(_))
@@ -1006,18 +962,22 @@ mod tests {
 
         // Correct context
         let proof_ok = McpProof::create(
-            &agent, "resolve",
+            &agent,
+            "resolve",
             serde_json::json!({"session_id": "sess-abc"}),
             delegation.clone(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(verify_mcp_call(&proof_ok, &root.identity()).is_ok());
 
         // Wrong context
         let proof_bad = McpProof::create(
-            &agent, "resolve",
+            &agent,
+            "resolve",
             serde_json::json!({"session_id": "sess-xyz"}),
             delegation,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(matches!(
             verify_mcp_call(&proof_bad, &root.identity()),
             Err(CryptoError::CaveatViolation(_))
@@ -1043,18 +1003,22 @@ mod tests {
 
         // All caveats satisfied
         let proof_ok = McpProof::create(
-            &agent, "resolve",
+            &agent,
+            "resolve",
             serde_json::json!({"cost": 5.0, "resource": "entity:123"}),
             delegation.clone(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(verify_mcp_call(&proof_ok, &root.identity()).is_ok());
 
         // Wrong action (first caveat fails)
         let proof_bad = McpProof::create(
-            &agent, "merge",
+            &agent,
+            "merge",
             serde_json::json!({"cost": 5.0, "resource": "entity:123"}),
             delegation,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(matches!(
             verify_mcp_call(&proof_bad, &root.identity()),
             Err(CryptoError::CaveatViolation(_))
@@ -1068,25 +1032,30 @@ mod tests {
         let root = keypair();
         let agent = keypair();
 
-        let delegation = Delegation::create_root(
-            &root, &agent.identity().did, vec![],
-        ).unwrap();
+        let delegation = Delegation::create_root(&root, &agent.identity().did, vec![]).unwrap();
 
         let proof = McpProof::create(
-            &agent, "resolve", serde_json::json!({"source": "crm"}), delegation,
-        ).unwrap();
+            &agent,
+            "resolve",
+            serde_json::json!({"source": "crm"}),
+            delegation,
+        )
+        .unwrap();
 
         let json: serde_json::Value = serde_json::to_value(&proof).unwrap();
 
         // invoker_public_key must be a string (hex), not an array of numbers
-        assert!(json["invoker_public_key"].is_string(),
+        assert!(
+            json["invoker_public_key"].is_string(),
             "invoker_public_key must serialize as hex string, got: {}",
             json["invoker_public_key"]
         );
         let pk_str = json["invoker_public_key"].as_str().unwrap();
         assert_eq!(pk_str.len(), 64, "hex-encoded 32-byte key = 64 chars");
-        assert!(pk_str.chars().all(|c| c.is_ascii_hexdigit()),
-            "must be valid hex: {}", pk_str
+        assert!(
+            pk_str.chars().all(|c| c.is_ascii_hexdigit()),
+            "must be valid hex: {}",
+            pk_str
         );
     }
 
