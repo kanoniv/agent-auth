@@ -157,6 +157,19 @@ did:agent:{hex(sha256(public_key)[..16])}
 
 32-character hex identifier derived from the SHA-256 hash of the Ed25519 public key. W3C DID method registration pending (PR #681).
 
+## Framework Integrations
+
+Drop-in delegation for popular agent frameworks. Each integration wraps the existing framework API - the framework doesn't need to know about the crypto.
+
+| Framework | Integration | Pattern |
+|-----------|------------|---------|
+| [CrewAI](https://crewai.com) | `integrations/crewai_auth.py` | `DelegatedCrewManager` manages delegation chains for crews |
+| [LangGraph](https://langchain-ai.github.io/langgraph/) | `integrations/langgraph_auth.py` | `@requires_delegation` decorator gates graph nodes |
+| [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) | `integrations/openai_agents_auth.py` | `DelegatedRunner` + `@delegated_tool` with handoff and revocation |
+| [AutoGen](https://github.com/microsoft/autogen) | `integrations/autogen_auth.py` | `DelegatedAgent` + `AuthorityManager` with sub-delegation |
+
+See [integrations/README.md](integrations/README.md) for usage examples.
+
 ## Cross-Language Interop
 
 All three implementations produce byte-identical:
