@@ -170,6 +170,14 @@ Drop-in delegation for popular agent frameworks. Each integration wraps the exis
 
 See [integrations/README.md](integrations/README.md) for usage examples.
 
+## Tutorials
+
+| Tutorial | Description |
+|----------|-------------|
+| [Multi-Agent Handoff](tutorials/langgraph_multi_agent_handoff.py) | LangGraph pipeline with 3 specialists, scoped budgets, and `@requires_delegation` gating |
+
+See [tutorials/README.md](tutorials/README.md) for details.
+
 ## Cross-Language Interop
 
 All three implementations produce byte-identical:
