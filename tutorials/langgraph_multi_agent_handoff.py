@@ -60,6 +60,11 @@ class DelegationContext:
         self.invocations = []
 
 
+# Global revocation set. In production this would be backed by a database
+# or the Kanoniv Cloud API. Here we use a simple set of content hashes.
+REVOKED_DELEGATIONS: set[str] = set()
+
+
 def requires_delegation(actions=None, require_cost=False, require_resource=False):
     """Decorator: gate a LangGraph node behind delegation verification."""
 
@@ -69,6 +74,10 @@ def requires_delegation(actions=None, require_cost=False, require_resource=False
             ctx = state.get("delegation_context")
             if ctx is None:
                 return {**state, "error": "No delegation context."}
+
+            # Check revocation before verifying the chain
+            if ctx.delegation.content_hash() in REVOKED_DELEGATIONS:
+                return {**state, "error": f"Delegation revoked for {ctx.agent_keypair.identity().did}"}
 
             action = state.get("action", func.__name__)
             args = state.get("args", {})
@@ -217,8 +226,8 @@ def search_node(state: PipelineState) -> PipelineState:
 def summarize_node(state: PipelineState) -> PipelineState:
     """Researcher summarizes search results."""
     results = state.get("search_results", [])
-    topic = state["args"].get("topic", "topic")
-    print(f"    [summarize] Condensing {len(results)} results")
+    topic = state["args"].get("topic", "unknown")
+    print(f"    [summarize] Condensing {len(results)} results on '{topic}'")
     return {
         **state,
         "summary": f"Summary of {len(results)} findings on '{topic}'",
@@ -373,6 +382,7 @@ def run_pipeline(agents):
     }
 
     phase_order = ["search", "summarize", "draft", "edit", "review"]
+    audit_trail = []
 
     state: PipelineState = {}
 
@@ -392,13 +402,27 @@ def run_pipeline(agents):
             "error": "",
         }
 
-        # Invoke the graph: coordinator -> specialist -> back to coordinator -> END
+        # Invoke the graph: coordinator -> specialist -> END
         app = build_graph()
         state = app.invoke(state)
+
+        # Collect audit entries from this phase's context
+        for inv in ctx.invocations:
+            audit_trail.append({
+                "phase": phase,
+                "agent": keypair.identity().did,
+                **inv,
+            })
 
         if state.get("error"):
             print(f"    Pipeline halted: {state['error']}")
             break
+
+    # Print audit summary
+    print(f"\n--- Audit Trail ({len(audit_trail)} verified actions) ---\n")
+    for entry in audit_trail:
+        did_short = entry["agent"].split(":")[-1][:12]
+        print(f"  {entry['phase']:>10}  did:..{did_short}  depth={entry['depth']}")
 
     return state
 
@@ -461,6 +485,65 @@ def test_boundaries(agents):
 
 
 # ---------------------------------------------------------------------------
+# Step 8: Mid-pipeline revocation
+# ---------------------------------------------------------------------------
+# Revoke the Writer's delegation after the search phase completes.
+# The Writer's draft and edit calls should fail immediately.
+
+def test_revocation(agents):
+    """Demonstrate mid-pipeline revocation."""
+    print("\n--- Mid-Pipeline Revocation ---\n")
+
+    human_id = agents["human"].identity()
+    writer_keypair, writer_del = agents["writer"]
+    researcher_keypair, researcher_del = agents["researcher"]
+
+    # Writer drafts successfully before revocation
+    ctx = DelegationContext(writer_keypair, writer_del, human_id)
+    app = build_graph()
+    state: PipelineState = {
+        "current_phase": "draft",
+        "action": "draft",
+        "args": {"topic": "test", "cost": 1.0},
+        "delegation_context": ctx,
+    }
+    result = app.invoke(state)
+    blocked = result.get("error", "")
+    print(f"  Writer drafts (before revocation): {'BLOCKED - ' + blocked if blocked else 'OK'}")
+
+    # Revoke the Writer's delegation
+    REVOKED_DELEGATIONS.add(writer_del.content_hash())
+    print(f"  Writer delegation revoked (hash: {writer_del.content_hash()[:16]}...)")
+
+    # Writer tries to draft again, immediately blocked
+    ctx = DelegationContext(writer_keypair, writer_del, human_id)
+    state = {
+        "current_phase": "draft",
+        "action": "draft",
+        "args": {"topic": "test", "cost": 1.0},
+        "delegation_context": ctx,
+    }
+    result = app.invoke(state)
+    blocked = result.get("error", "")
+    print(f"  Writer drafts (after revocation):  {'BLOCKED - ' + blocked if blocked else 'OK'}")
+
+    # Researcher is unaffected
+    ctx = DelegationContext(researcher_keypair, researcher_del, human_id)
+    state = {
+        "current_phase": "search",
+        "action": "search",
+        "args": {"query": "still works", "cost": 0.5},
+        "delegation_context": ctx,
+    }
+    result = app.invoke(state)
+    blocked = result.get("error", "")
+    print(f"  Researcher searches (unaffected):  {'BLOCKED - ' + blocked if blocked else 'OK'}")
+
+    # Clean up for other tests
+    REVOKED_DELEGATIONS.discard(writer_del.content_hash())
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -479,6 +562,9 @@ if __name__ == "__main__":
 
     # Boundary tests: agents blocked outside their scope
     test_boundaries(agents)
+
+    # Revocation: Writer loses authority mid-pipeline
+    test_revocation(agents)
 
     print("\n" + "=" * 60)
     print("Done. Every node was cryptographically verified via LangGraph.")
