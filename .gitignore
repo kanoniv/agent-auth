@@ -12,6 +12,7 @@ dist/
 *.dylib
 *.pyd
 .venv/
+.venv_test/
 
 # TypeScript
 js/node_modules/
