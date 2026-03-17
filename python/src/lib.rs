@@ -1,5 +1,5 @@
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 
 /// Python wrapper around AgentKeyPair.
 #[pyclass(frozen)]
@@ -21,10 +21,7 @@ impl AgentKeyPair {
     #[staticmethod]
     fn from_bytes(secret: &[u8]) -> PyResult<Self> {
         let arr: [u8; 32] = secret.try_into().map_err(|_| {
-            PyValueError::new_err(format!(
-                "Expected 32 bytes, got {}",
-                secret.len()
-            ))
+            PyValueError::new_err(format!("Expected 32 bytes, got {}", secret.len()))
         })?;
         Ok(Self {
             inner: kanoniv_agent_auth::AgentKeyPair::from_bytes(&arr),
@@ -110,7 +107,7 @@ impl AgentIdentity {
 }
 
 /// A service endpoint for DID Documents.
-#[pyclass(frozen)]
+#[pyclass(frozen, from_py_object)]
 #[derive(Clone)]
 struct PyServiceEndpoint {
     #[pyo3(get)]
@@ -125,11 +122,18 @@ struct PyServiceEndpoint {
 impl PyServiceEndpoint {
     #[new]
     fn new(id: String, service_type: String, endpoint: String) -> Self {
-        Self { id, service_type, endpoint }
+        Self {
+            id,
+            service_type,
+            endpoint,
+        }
     }
 
     fn __repr__(&self) -> String {
-        format!("ServiceEndpoint(id='{}', type='{}')", self.id, self.service_type)
+        format!(
+            "ServiceEndpoint(id='{}', type='{}')",
+            self.id, self.service_type
+        )
     }
 }
 
@@ -332,8 +336,11 @@ impl Delegation {
         let caveats: Vec<kanoniv_agent_auth::Caveat> = serde_json::from_str(caveats_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid caveats JSON: {}", e)))?;
         let inner = kanoniv_agent_auth::Delegation::create_root(
-            &issuer_keypair.inner, delegate_did, caveats,
-        ).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            &issuer_keypair.inner,
+            delegate_did,
+            caveats,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
 
@@ -345,22 +352,33 @@ impl Delegation {
         additional_caveats_json: &str,
         parent: &Delegation,
     ) -> PyResult<Self> {
-        let caveats: Vec<kanoniv_agent_auth::Caveat> = serde_json::from_str(additional_caveats_json)
-            .map_err(|e| PyValueError::new_err(format!("Invalid caveats JSON: {}", e)))?;
+        let caveats: Vec<kanoniv_agent_auth::Caveat> =
+            serde_json::from_str(additional_caveats_json)
+                .map_err(|e| PyValueError::new_err(format!("Invalid caveats JSON: {}", e)))?;
         let inner = kanoniv_agent_auth::Delegation::delegate(
-            &issuer_keypair.inner, delegate_did, caveats, parent.inner.clone(),
-        ).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            &issuer_keypair.inner,
+            delegate_did,
+            caveats,
+            parent.inner.clone(),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
 
     #[getter]
-    fn issuer_did(&self) -> String { self.inner.issuer_did.clone() }
+    fn issuer_did(&self) -> String {
+        self.inner.issuer_did.clone()
+    }
 
     #[getter]
-    fn delegate_did(&self) -> String { self.inner.delegate_did.clone() }
+    fn delegate_did(&self) -> String {
+        self.inner.delegate_did.clone()
+    }
 
     #[getter]
-    fn depth(&self) -> usize { self.inner.depth() }
+    fn depth(&self) -> usize {
+        self.inner.depth()
+    }
 
     /// Get the content hash of this delegation's proof (for revocation).
     fn content_hash(&self) -> String {
@@ -368,7 +386,10 @@ impl Delegation {
     }
 
     fn __repr__(&self) -> String {
-        format!("Delegation(issuer='{}', delegate='{}')", self.inner.issuer_did, self.inner.delegate_did)
+        format!(
+            "Delegation(issuer='{}', delegate='{}')",
+            self.inner.issuer_did, self.inner.delegate_did
+        )
     }
 }
 
@@ -392,19 +413,30 @@ impl Invocation {
         let args: serde_json::Value = serde_json::from_str(args_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid JSON: {}", e)))?;
         let inner = kanoniv_agent_auth::Invocation::create(
-            &invoker_keypair.inner, action, args, delegation.inner.clone(),
-        ).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            &invoker_keypair.inner,
+            action,
+            args,
+            delegation.inner.clone(),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
 
     #[getter]
-    fn invoker_did(&self) -> String { self.inner.invoker_did.clone() }
+    fn invoker_did(&self) -> String {
+        self.inner.invoker_did.clone()
+    }
 
     #[getter]
-    fn action(&self) -> String { self.inner.action.clone() }
+    fn action(&self) -> String {
+        self.inner.action.clone()
+    }
 
     fn __repr__(&self) -> String {
-        format!("Invocation(invoker='{}', action='{}')", self.inner.invoker_did, self.inner.action)
+        format!(
+            "Invocation(invoker='{}', action='{}')",
+            self.inner.invoker_did, self.inner.action
+        )
     }
 }
 
@@ -416,9 +448,17 @@ fn verify_invocation(
     root_identity: &AgentIdentity,
 ) -> PyResult<(String, String, Vec<String>, usize)> {
     let result = kanoniv_agent_auth::verify_invocation(
-        &invocation.inner, &invoker_identity.inner, &root_identity.inner,
-    ).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok((result.invoker_did, result.root_did, result.chain, result.depth))
+        &invocation.inner,
+        &invoker_identity.inner,
+        &root_identity.inner,
+    )
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((
+        result.invoker_did,
+        result.root_did,
+        result.chain,
+        result.depth,
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +469,7 @@ fn verify_invocation(
 ///
 /// Contains everything an MCP server needs to verify the agent's identity
 /// and authority without any external key resolver.
-#[pyclass(frozen)]
+#[pyclass(frozen, from_py_object)]
 #[derive(Clone)]
 struct McpProof {
     inner: kanoniv_agent_auth::McpProof,
@@ -448,8 +488,12 @@ impl McpProof {
         let args: serde_json::Value = serde_json::from_str(args_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid JSON: {}", e)))?;
         let inner = kanoniv_agent_auth::McpProof::create(
-            &invoker_keypair.inner, action, args, delegation.inner.clone(),
-        ).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            &invoker_keypair.inner,
+            action,
+            args,
+            delegation.inner.clone(),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
 
@@ -502,10 +546,15 @@ fn verify_mcp_call(
     proof: &McpProof,
     root_identity: &AgentIdentity,
 ) -> PyResult<(String, String, Vec<String>, usize)> {
-    let result = kanoniv_agent_auth::mcp::verify_mcp_call(
-        &proof.inner, &root_identity.inner,
-    ).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok((result.invoker_did, result.root_did, result.chain, result.depth))
+    let result =
+        kanoniv_agent_auth::mcp::verify_mcp_call(&proof.inner, &root_identity.inner)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((
+        result.invoker_did,
+        result.root_did,
+        result.chain,
+        result.depth,
+    ))
 }
 
 /// Extract an MCP proof from a JSON arguments string.
