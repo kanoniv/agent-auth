@@ -115,21 +115,109 @@ INSERT INTO memory (entry_type, slug, title, content, metadata, author, subject_
   ('outcome', 'out-adb-06', 'optimize: failed', 'CPA above threshold', '{"action": "optimize", "result": "failure", "reward_signal": -0.6}', 'agent:ad-buyer', 'did:agent:adb-3f5e1a9c')
 ON CONFLICT (slug) DO NOTHING;
 
--- Memory entries
-INSERT INTO memory (entry_type, slug, title, content, metadata, author, linked_agents) VALUES
+-- Memory entries (2-3 per agent, with timestamps spread across the last few weeks)
+INSERT INTO memory (entry_type, slug, title, content, metadata, author, linked_agents, created_at) VALUES
+  -- Coordinator
   ('knowledge', 'know-workflow-patterns', 'Multi-agent workflow patterns',
    'The coordinator-researcher-reviewer pipeline achieves 91% success rate. Key insight: having reviewer validate before merging reduces errors by 40%.',
-   '{"category": "workflow"}', 'agent:coordinator', ARRAY['coordinator', 'researcher', 'reviewer']),
+   '{"category": "workflow"}', 'agent:coordinator', ARRAY['coordinator', 'researcher', 'reviewer'],
+   now() - interval '18 days'),
   ('decision', 'dec-writer-scope', 'Limit writer to content tasks only',
    'Writer agent produces better output when scoped strictly to content. Avoid assigning data analysis tasks.',
-   '{"reason": "mixed results on non-content tasks"}', 'agent:coordinator', ARRAY['writer']),
+   '{"reason": "mixed results on non-content tasks"}', 'agent:coordinator', ARRAY['writer'],
+   now() - interval '12 days'),
+  ('pattern', 'pat-coord-delegation', 'Delegation timing affects success rate',
+   'Tasks delegated in smaller batches (3-5 at a time) have 23% higher completion rates than bulk delegations. Coordinator should pace work distribution.',
+   '{"severity": "low", "confidence": "high"}', 'agent:coordinator', ARRAY['coordinator'],
+   now() - interval '5 days'),
+
+  -- Researcher
+  ('knowledge', 'know-source-ranking', 'Source reliability ranking',
+   'Academic papers > government data > industry reports > blog posts. When sources conflict, prefer the one with the larger sample size.',
+   '{"category": "methodology"}', 'agent:researcher', ARRAY['researcher'],
+   now() - interval '21 days'),
+  ('investigation', 'inv-api-rate-limits', 'API rate limit investigation',
+   'Search API rate limited after 50 requests/minute. Implemented exponential backoff with jitter. Success rate recovered from 72% to 89% after the fix.',
+   '{"status": "resolved", "resolution": "backoff strategy"}', 'agent:researcher', ARRAY['researcher'],
+   now() - interval '14 days'),
+  ('decision', 'dec-summarize-length', 'Cap summaries at 500 words',
+   'Verbose summaries (800+ words) consistently scored lower in reviewer feedback. Capping at 500 words improved feedback score from 0.4 to 0.65.',
+   '{"reason": "reviewer feedback pattern"}', 'agent:researcher', ARRAY['researcher', 'reviewer'],
+   now() - interval '6 days'),
+
+  -- Reviewer
   ('pattern', 'pat-ad-buyer-struggles', 'Ad buyer learning curve is steep',
    'The ad-buyer agent struggles with budget optimization. Consider pairing with analyst for data-informed bidding.',
-   '{"severity": "medium"}', 'agent:reviewer', ARRAY['ad-buyer', 'analyst']),
+   '{"severity": "medium"}', 'agent:reviewer', ARRAY['ad-buyer', 'analyst'],
+   now() - interval '16 days'),
+  ('knowledge', 'know-review-criteria', 'Review criteria hierarchy',
+   'Accuracy > completeness > formatting. Reject on factual errors regardless of other quality. Partial results are acceptable if the accurate portion is flagged.',
+   '{"category": "process"}', 'agent:reviewer', ARRAY['reviewer'],
+   now() - interval '9 days'),
+  ('decision', 'dec-auto-approve-threshold', 'Auto-approve above 0.9 confidence',
+   'Actions with confidence score above 0.9 and no flagged anomalies can be auto-approved without manual review. Reduces review bottleneck by 35%.',
+   '{"reason": "throughput optimization", "risk": "low"}', 'agent:reviewer', ARRAY['reviewer', 'coordinator'],
+   now() - interval '3 days'),
+
+  -- Analyst
+  ('knowledge', 'know-visualization-rules', 'Visualization best practices',
+   'Use bar charts for comparisons, line charts for trends, and tables for exact values. Avoid pie charts - they are consistently misread by downstream agents.',
+   '{"category": "reporting"}', 'agent:analyst', ARRAY['analyst'],
+   now() - interval '20 days'),
+  ('investigation', 'inv-cohort-data-gap', 'Missing cohort data investigation',
+   'Cohort analysis failed because user_created_at was null for 30% of records. Root cause: legacy migration skipped backfill. Workaround: use first_action_at as proxy.',
+   '{"status": "resolved", "resolution": "proxy field"}', 'agent:analyst', ARRAY['analyst', 'researcher'],
+   now() - interval '10 days'),
+  ('pattern', 'pat-weekly-report-timing', 'Weekly reports peak on Mondays',
+   'Report requests spike 3x on Monday mornings. Pre-computing Sunday night reduces response time from 12s to 0.8s.',
+   '{"severity": "low", "confidence": "high"}', 'agent:analyst', ARRAY['analyst'],
+   now() - interval '4 days'),
+
+  -- Writer
+  ('knowledge', 'know-tone-guidelines', 'Content tone guidelines',
+   'Technical blog posts should be concise and direct. Marketing copy should be aspirational but specific. Never use jargon without defining it first.',
+   '{"category": "style"}', 'agent:writer', ARRAY['writer'],
+   now() - interval '19 days'),
+  ('investigation', 'inv-off-topic-failures', 'Off-topic content investigation',
+   'Two consecutive off-topic failures traced to ambiguous task descriptions. When the task prompt lacks a specific audience, output drifts to generic content.',
+   '{"status": "resolved", "resolution": "require audience field in task spec"}', 'agent:writer', ARRAY['writer', 'coordinator'],
+   now() - interval '11 days'),
+  ('decision', 'dec-writer-self-review', 'Writer self-review before submission',
+   'Added a self-review step where writer checks output against the original task spec. Early results: failure rate dropped from 32% to 18%.',
+   '{"reason": "high failure rate"}', 'agent:writer', ARRAY['writer'],
+   now() - interval '2 days'),
+
+  -- Social Manager
   ('investigation', 'inv-social-auth', 'Social media API auth investigation',
-   'Social manager failed 3 scheduled posts due to expired OAuth tokens. Need to implement token refresh.',
-   '{"status": "in_progress"}', 'agent:social-manager', ARRAY['social-manager']),
+   'Social manager failed 3 scheduled posts due to expired OAuth tokens. Need to implement token refresh before each batch.',
+   '{"status": "in_progress"}', 'agent:social-manager', ARRAY['social-manager'],
+   now() - interval '15 days'),
+  ('knowledge', 'know-posting-schedule', 'Optimal posting times by platform',
+   'Twitter: 9-11am EST weekdays. LinkedIn: Tuesday-Thursday 8am EST. Engagement drops 60% on weekends for B2B content.',
+   '{"category": "scheduling"}', 'agent:social-manager', ARRAY['social-manager'],
+   now() - interval '8 days'),
+  ('pattern', 'pat-engagement-spikes', 'Thread posts outperform single posts',
+   'Twitter threads (3-5 tweets) get 2.4x more engagement than single tweets with the same content. LinkedIn carousels outperform text posts by 1.8x.',
+   '{"severity": "low", "confidence": "medium"}', 'agent:social-manager', ARRAY['social-manager'],
+   now() - interval '1 day'),
+
+  -- Ad Buyer
+  ('investigation', 'inv-budget-overspend', 'Budget overspend root cause',
+   'Daily budget exceeded twice due to bid multiplier stacking with audience expansion. The optimization loop increased bids while simultaneously broadening targeting.',
+   '{"status": "resolved", "resolution": "added mutual exclusion between bid and audience adjustments"}', 'agent:ad-buyer', ARRAY['ad-buyer'],
+   now() - interval '13 days'),
+  ('knowledge', 'know-cpa-benchmarks', 'CPA benchmarks by channel',
+   'Google Search: $12-18 CPA. Facebook: $8-14 CPA. LinkedIn: $25-40 CPA. Retargeting consistently 40-60% cheaper than cold acquisition across all channels.',
+   '{"category": "benchmarks"}', 'agent:ad-buyer', ARRAY['ad-buyer'],
+   now() - interval '7 days'),
+  ('decision', 'dec-pause-linkedin', 'Pause LinkedIn ad spend',
+   'LinkedIn CPA ($38) is 2.7x above target ($14). Reallocating budget to Google Search retargeting until audience targeting improves.',
+   '{"reason": "CPA above threshold", "budget_impact": "-$200/week"}', 'agent:ad-buyer', ARRAY['ad-buyer', 'coordinator'],
+   now() - interval '1 day'),
+
+  -- System-level knowledge
   ('knowledge', 'know-reputation-formula', 'Reputation score breakdown',
    'Composite score = 30% activity + 25% success rate + 20% feedback + 15% tenure + 10% diversity. Minimum 10 actions for reliable score.',
-   '{"category": "system"}', 'system', '{}')
+   '{"category": "system"}', 'system', '{}',
+   now() - interval '25 days')
 ON CONFLICT (slug) DO NOTHING;
