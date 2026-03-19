@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Search, Fingerprint, Shield, Link2, Brain, Eye,
   Plus, BarChart3, ClipboardList, CheckCircle2, XCircle,
-  AlertTriangle, Activity, RefreshCw,
+  AlertTriangle, Activity, RefreshCw, ChevronRight,
 } from 'lucide-react';
 import { useAgents } from '@/hooks/useAgents';
 import { useDelegations } from '@/hooks/useDelegations';
@@ -57,6 +57,7 @@ export const AgentsPage: React.FC = () => {
 
   // Memory form
   const [showMemoryForm, setShowMemoryForm] = useState(false);
+  const [expandedMemoryId, setExpandedMemoryId] = useState<string | null>(null);
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryContent, setMemoryContent] = useState('');
   const [memoryType, setMemoryType] = useState('knowledge');
@@ -679,14 +680,34 @@ export const AgentsPage: React.FC = () => {
                           className="w-full text-xs py-1.5 rounded bg-[#C5A572] text-[#0a0a0f] font-bold disabled:opacity-50">Save</button>
                       </div>
                     )}
-                    {selectedMemories.length > 0 ? selectedMemories.slice(0, 10).map(m => (
-                      <div key={m.id} className="flex items-center gap-2 rounded-lg bg-[#0a0a0f] border border-white/[.07] px-3 py-2 mb-1.5">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">{m.entry_type}</span>
-                        <span className="text-[10px] text-zinc-300 flex-1 truncate">{m.title}</span>
-                        <button onClick={() => handleArchiveMemory(m.id)}
-                          className="text-zinc-600 hover:text-red-400 transition-colors text-[9px]">archive</button>
-                      </div>
-                    )) : <div className="text-[10px] text-zinc-600 py-2">No memory entries</div>}
+                    {selectedMemories.length > 0 ? selectedMemories.slice(0, 10).map(m => {
+                      const isExpanded = expandedMemoryId === m.id;
+                      return (
+                        <div key={m.id} className="rounded-lg bg-[#0a0a0f] border border-white/[.07] mb-1.5 overflow-hidden">
+                          <button
+                            onClick={() => setExpandedMemoryId(isExpanded ? null : m.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/[.02] transition-colors"
+                          >
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">{m.entry_type}</span>
+                            <span className={cn('text-[10px] text-zinc-300 flex-1', !isExpanded && 'truncate')}>{m.title}</span>
+                            <ChevronRight className={cn('w-3 h-3 text-zinc-600 shrink-0 transition-transform', isExpanded && 'rotate-90')} />
+                          </button>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 space-y-2">
+                              {m.content && (
+                                <p className="text-[10px] text-zinc-400 leading-relaxed">{m.content}</p>
+                              )}
+                              <div className="flex items-center gap-3 text-[9px] text-zinc-600">
+                                <span>{m.author}</span>
+                                <span>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                <button onClick={() => handleArchiveMemory(m.id)}
+                                  className="ml-auto text-zinc-600 hover:text-red-400 transition-colors">archive</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }) : <div className="text-[10px] text-zinc-600 py-2">No memory entries</div>}
                   </div>
                 </div>
               )}
