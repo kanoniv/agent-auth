@@ -3,7 +3,6 @@ import {
   Users,
   Waypoints,
   Shield,
-  MessageCircle,
   Globe,
 } from 'lucide-react';
 
@@ -47,5 +46,4 @@ export const NAV_ITEMS = [
   { id: 'graph', label: 'Trust Graph', icon: Waypoints, path: '/graph' },
   { id: 'provenance', label: 'Provenance', icon: Shield, path: '/provenance' },
   { id: 'interop', label: 'Interop', icon: Globe, path: '/interop' },
-  { id: 'chat', label: 'Chat', icon: MessageCircle, path: '/chat' },
 ] as const;

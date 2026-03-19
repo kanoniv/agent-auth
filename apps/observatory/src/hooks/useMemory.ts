@@ -20,9 +20,9 @@ export function useMemory(pollInterval = 30000) {
     try {
       const f = (path: string) => apiFetch(path).catch(() => null);
       const [memRes, taskRes, outRes] = await Promise.all([
-        f('/v1/memory?limit=30'),
+        f('/v1/memory?limit=200'),
         f('/v1/memory?entry_type=task&status=active&limit=30'),
-        f('/v1/memory?entry_type=outcome&limit=30'),
+        f('/v1/memory?entry_type=outcome&limit=50'),
       ]);
       if (memRes?.ok) {
         const data = await memRes.json();
