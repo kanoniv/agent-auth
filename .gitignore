@@ -17,6 +17,9 @@ dist/
 js/node_modules/
 js/dist/
 js/package-lock.json
+apps/observatory/node_modules/
+apps/observatory/dist/
+apps/api/node_modules/
 
 # IDE
 .idea/

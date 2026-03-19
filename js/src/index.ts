@@ -51,3 +51,10 @@ export {
   verifyMcpToolCall,
   verifyMcpToolCallWithRevocation,
 } from "./mcp.js";
+export {
+  type ReputationClaim,
+  createReputationClaim,
+  verifyReputationClaim,
+  verifyReputationClaimSignatureOnly,
+  reputationClaimContentHash,
+} from "./reputation.js";

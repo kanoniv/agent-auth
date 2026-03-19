@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.agent-trust-demo.db
+.pytest_cache/

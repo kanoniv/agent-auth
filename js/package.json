@@ -1,6 +1,6 @@
 {
   "name": "@kanoniv/agent-auth",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Cryptographic identity and delegation for AI agents - Ed25519 keypairs, DIDs, delegation chains, MCP auth",
   "type": "module",
   "main": "dist/index.js",

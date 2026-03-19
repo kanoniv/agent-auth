@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agent_trust
+      POSTGRES_USER: agent_trust
+      POSTGRES_PASSWORD: agent_trust_dev
+    ports:
+      - "5555:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_trust"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+    ports:
+      - "4100:4100"
+    environment:
+      DATABASE_URL: postgres://agent_trust:agent_trust_dev@db:5432/agent_trust
+      PORT: "4100"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  observatory:
+    build:
+      context: ./apps/observatory
+    ports:
+      - "4173:4173"
+    environment:
+      VITE_API_URL: http://localhost:4100
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
