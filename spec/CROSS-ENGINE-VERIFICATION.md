@@ -1,7 +1,7 @@
 # Cross-Engine Delegation Verification
 
-**Version:** 0.1.0
-**Status:** Proven (Round 1 complete)
+**Version:** 0.2.0
+**Status:** Round 1 complete, Round X in progress
 **Engines verified:** Kanoniv, APS, AIP
 
 ## 1. Overview
@@ -182,7 +182,18 @@ This adds a third verification path: the public key can be independently confirm
 
 Beyond delegation verification, engines can produce signed **decision artifacts** that prove an authorization decision was made and can be independently verified.
 
-### 7.1 Minimal Artifact Shape
+### 7.1 Verification Model: Input-Committed Verification
+
+A decision artifact proves: "given these declared inputs, this engine reached this verdict." A verifier checks whether the verdict is consistent with the declared inputs - not whether the engine's internal reasoning was correct step-by-step.
+
+This gives two verification layers:
+
+1. **Structural verification** (scope membership, chain validity, expiry) - universal logic, must converge across all engines. Deterministic by definition.
+2. **Trust-informed verification** (reputation, PDR, spend constraints) - engines declare their inputs and thresholds transparently. Convergence means: given the same evidence, would a reasonable evaluator reach the same verdict? Divergence is valid if the reasoning is exposed.
+
+Engines choose their exposure level (`hash` for commitments, `trace` for full transparency), but the input commitment is non-negotiable.
+
+### 7.2 Artifact Schema
 
 ```json
 {
@@ -202,6 +213,10 @@ Beyond delegation verification, engines can produce signed **decision artifacts*
   "trust_context": {
     "<engine>": { "...engine-specific-trust-signals..." }
   },
+  "determinism": {
+    "structural": "deterministic",
+    "trust_informed": "deterministic | declared_non_deterministic"
+  },
   "evaluated_at": "<rfc3339-timestamp>",
   "evaluator_did": "<evaluator-did>",
   "signature": "<evaluator-signature>",
@@ -209,28 +224,42 @@ Beyond delegation verification, engines can produce signed **decision artifacts*
 }
 ```
 
-### 7.2 Signed Fields
+### 7.3 Determinism Field
+
+Each artifact MUST declare the determinism class of its verification layers:
+
+| Value | Meaning | Replay expectation |
+|-------|---------|-------------------|
+| `deterministic` | Same inputs always produce the same verdict | Must converge on replay |
+| `declared_non_deterministic` | Verdict depends on engine-specific trust signals | Must expose reasoning; divergence is valid if explained |
+
+Structural checks (scope membership, chain validity, expiry) are always `deterministic`. Trust-informed checks vary by engine.
+
+### 7.4 Signed Fields
 
 The evaluator signs all fields except `signature`, `public_key`, and `evaluator_did`. Canonical JSON with sorted keys.
 
-### 7.3 Trust Context
+### 7.5 Trust Context
 
-Each engine contributes its own trust signals. These are engine-specific and opaque to other verifiers - they verify the signature and decision, not the trust model.
+Each engine contributes its own trust signals. These are engine-specific and intentionally non-comparable - engines converge on verdicts, not inputs. Verifiers check the signature and decision consistency, not the trust model internals.
 
-| Engine | Trust Signals |
-|--------|--------------|
-| Kanoniv | `reputation_score`, `reputation_threshold`, `total_outcomes` |
-| APS | `delegation_chain_depth`, `spend_remaining`, `floor_attestation` |
-| AIP | `pdr_score`, `vouch_chain_depth` |
+| Engine | Trust Signals | Type |
+|--------|--------------|------|
+| Kanoniv | `reputation_score`, `reputation_threshold`, `total_outcomes` | Outcome-based (provenance-derived) |
+| APS | `delegation_chain_depth`, `spend_remaining`, `floor_attestation` | Structural (policy state) |
+| AIP | `pdr_score`, `pdr_drift`, `vouch_depth`, `trust_path_score`, `registry_resolved` | Behavioral (promise-delivery ratio) |
 
-### 7.4 Convergence Test
+### 7.6 Convergence Test
 
 The strongest interop proof is when multiple engines independently evaluate the same scenario and arrive at the same decision using different trust signals:
 
 1. Define a common scenario (`scenario_id`, `action`, `resource`, delegation)
-2. Each engine produces a signed decision artifact
+2. Each engine produces a signed decision artifact with its own `trust_context`
 3. Cross-verify: confirm signatures, confirm decisions match
 4. Compare trust contexts to understand why each engine reached the same conclusion
+5. If verdicts diverge: analyze which trust signals caused the disagreement
+
+Same verdict from different evidence = convergence. Different verdict = the most valuable output, surfacing exactly where trust models disagree.
 
 ## 8. Verification Matrix
 
@@ -238,17 +267,23 @@ Living record of cross-engine verification status.
 
 ### Round 1: Delegation Chain Verification (Complete)
 
-| Verifier | Kanoniv | APS | AIP |
-|----------|---------|-----|-----|
+| Verifier | Kanoniv (`did:key`) | APS (`did:aps`) | AIP (`did:aip`) |
+|----------|---------------------|-----------------|-----------------|
 | **Kanoniv** | -- | Verified | Verified |
 | **APS** | Verified | -- | Verified |
-| **AIP** | Verified | Verified (D1), Pending (D2) | -- |
+| **AIP** | Verified | Verified | -- |
 
-**Thread:** https://github.com/kanoniv/agent-auth/issues/2
+Three engines, three DID methods, full mutual cross-verification of Ed25519 delegation chains. The only friction encountered was canonical form ambiguity for subdelegations (APS) - resolved by clarifying that `parentId` is excluded from the signed payload.
 
 ### Round X: Decision Artifact Verification (In Progress)
 
-Status: Artifacts designed. Verification pending.
+Kanoniv has posted reference decision artifacts (permit + deny) for the test scenario:
+- **Permit:** Agent requests `data:read`, delegation grants `[data:read, data:write, search]`, reputation 0.82 >= 0.5 threshold.
+- **Deny:** Agent requests `admin:delete`, not in granted scopes. Reputation sufficient but scope check fails first.
+
+Awaiting APS and AIP artifacts for cross-engine convergence test.
+
+**Thread:** https://github.com/kanoniv/agent-auth/issues/2
 
 ## 9. Adding a New Engine
 
