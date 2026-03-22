@@ -2,9 +2,7 @@
 
 **Your AI agents currently have keys. We give them math instead.**
 
-AI agents are being given SSH keys and API tokens like it's 1999. Kanoniv agent-auth replaces long-lived credentials with cryptographic delegation tokens that are scope-confined, time-bounded, and fully auditable.
-
-```python
+```bash
 pip install kanoniv-auth
 ```
 
@@ -19,206 +17,122 @@ verify(action="deploy.prod", token=token)     # raises ScopeViolation
 
 That second line doesn't just fail. It **cannot** succeed. Not policy-blocked, not RBAC-blocked - cryptographically impossible without the root key.
 
-## Why This Exists
+## Claude Code Skill
 
-A typical AI-assisted deploy flow today:
-
-1. Developer tells Copilot/Devin/Claude to "fix the bug and deploy it"
-2. The agent gets a long-lived API token with broad permissions
-3. It pushes code, triggers the pipeline, maybe touches infra
-4. Nobody has a clean audit trail of what the agent decided vs what the human approved
-
-The "solution" most teams have is vibes. A slightly restricted token and hope.
-
-## What This Solves
-
-| Problem | How kanoniv-auth solves it |
-|---------|---------------------------|
-| Agents have broad permissions | Scope confinement - `deploy.staging` cannot touch prod |
-| Leaked tokens are valid forever | `expires_at` - hard ceiling, default 4h |
-| No audit trail for agent actions | Every action is signed with its delegation chain |
-| Agents can't delegate to sub-agents safely | Delegation chains only narrow, never widen |
-
-## The Demo Workflow
-
-```
-Human engineer
-    |-- signs delegation token
-          scopes: ["build", "test", "deploy.staging"]
-          ttl: 4h
-
-    Pipeline Orchestrator Agent (receives token)
-          |-- sub-delegates to Deploy Agent
-                scopes: ["deploy.staging"]  (can only narrow, never widen)
-
-    Deploy Agent executes
-          |-- signs execution envelope
-                action: deploy, target: staging
-                delegation_proof: <full chain>
-                result: success
-
-    Audit log = execution envelope hash
-    (verifiable without trusting any single system)
-```
-
-The prod environment never trusts the agent directly. It only verifies the math on the token chain.
-
-## CLI
+Scope-enforce your AI coding agent in one command:
 
 ```bash
-# Install
-cargo install kanoniv-agent-auth --features cli
-
-# Generate root key (treat like an SSH key)
-kanoniv-auth init
-
-# Issue a delegation token
-kanoniv-auth delegate --scopes deploy.staging,build --ttl 4h
-# outputs: eyJhZ2VudF9kaWQ...
-
-# Agent verifies it has authority
-kanoniv-auth verify --scope deploy.staging --token $KANONIV_TOKEN
-# VERIFIED
-#   Agent:   did:agent:b15b9019...
-#   Scopes:  ["deploy.staging", "build"]
-#   Expires: 3h47m remaining
-
-# Agent tries to touch prod
-kanoniv-auth verify --scope deploy.prod --token $KANONIV_TOKEN
-# error: DENIED: scope "deploy.prod" not in delegation
-#
-#   You have:  [deploy.staging, build]
-#   You need:  ["deploy.prod"]
-
-# Agent signs an execution envelope (audit trail)
-kanoniv-auth sign --action deploy --target staging --token $KANONIV_TOKEN
-
-# Inspect any token or envelope
-kanoniv-auth whoami --token $KANONIV_TOKEN
-kanoniv-auth audit <envelope>
+kanoniv-auth install-skill
 ```
 
-## Python API
+Then in Claude Code:
 
-```python
-from kanoniv_auth import delegate, verify, sign, init_root, load_root
-
-# Generate root key (once)
-root = init_root("~/.kanoniv/root.key")
-
-# Issue delegation
-token = delegate(
-    scopes=["deploy.staging", "build"],
-    ttl="4h",
-)
-
-# Verify (agent-side)
-result = verify(action="deploy.staging", token=token)
-# {"valid": True, "scopes": [...], "ttl_remaining": 14380.0, ...}
-
-# Sub-delegate (narrowing only)
-sub_token = delegate(
-    scopes=["deploy.staging"],
-    ttl="1h",
-    parent_token=token,
-)
-
-# Sign execution (audit trail)
-envelope = sign(
-    action="deploy",
-    token=token,
-    target="staging",
-    result="success",
-    metadata={"commit": "abc123"},
-)
+```
+/delegate
+> What should Claude Code be allowed to do?
+> A) Full dev - code.edit, test.run, git.commit, git.push
 ```
 
-### Error Handling
+Every tool call is now verified. If Claude tries to exceed its scope:
 
-Every error tells you what happened and how to fix it:
+```
+SCOPE DENIED: requires git.push
 
-```python
-try:
-    verify(action="deploy.prod", token=token)
-except ScopeViolation as e:
-    print(e)
-    # DENIED: scope "deploy.prod" not in delegation
-    #
-    #   You have:  ["deploy.staging"]
-    #   You need:  ["deploy.prod"]
-    #
-    #   To request escalation:
-    #     kanoniv-auth request-scope --scope deploy.prod --from did:agent:abc...
+  You have:  ["code.edit", "test.run"]
+  You need:  ["git.push"]
+```
+
+The command never runs. Type `/audit` to see every action the agent took. Type `/status` to check the current delegation.
+
+## Named Agents
+
+Agents keep the same identity across sessions:
+
+```bash
+kanoniv-auth delegate --name claude-code --scopes code.edit,test.run --ttl 4h
+kanoniv-auth delegate --name deploy-bot --scopes deploy.staging --ttl 1h
+```
+
+Same name = same DID every time. Your audit trail shows a consistent history.
+
+## Hierarchical Scopes
+
+Scopes are dot-separated and hierarchical:
+
+```
+git.push                          # any repo, any branch
+git.push.agent-auth               # agent-auth only
+git.push.agent-auth.main          # agent-auth main only
+```
+
+`git.push` grants everything below it. `git.push.agent-auth.main` grants only that specific repo and branch.
+
+## Git Pre-Push Hook
+
+Invisible enforcement at the git level:
+
+```bash
+kanoniv-auth install-hook
+```
+
+Now `git push` verifies `git.push.{repo}.{branch}` scope before allowing the push. No wrapper needed - just push as normal.
+
+## Exec Wrapper
+
+Verify, run, sign in one command:
+
+```bash
+kanoniv-auth exec --scope deploy.staging -- ./deploy.sh staging
+```
+
+If the scope check fails, the command never runs. If it succeeds, the result is signed for the audit trail.
+
+## Audit Trail
+
+Every delegate, verify, sign, and exec is auto-logged:
+
+```bash
+kanoniv-auth audit-log --agent claude-code
+```
+
+```
+19:15:03  claude-code  tool:bash   git commit -m "feat: ..."     ok
+19:15:05  claude-code  tool:bash   cargo test --lib               ok
+19:15:08  claude-code  tool:edit   src/lib.rs                     ok
+19:15:12  claude-code  tool:bash   git push origin main           DENIED
 ```
 
 ## How It Works
 
-**Ed25519 signatures.** Every delegation is a signed message from the delegator to the delegate. The chain is self-contained - verification requires no network call, no database lookup, no trust in any third party.
+**Ed25519 signatures.** Every delegation is a signed message. The chain is self-contained - verification requires no network call, no database, no trust in any third party.
 
-**Scope narrowing.** A delegation can only grant a subset of the parent's scopes. Root grants `[build, test, deploy.staging]`. Sub-delegation can grant `[deploy.staging]` but cannot add `deploy.prod`. This is enforced by the math, not by policy.
+**Scope narrowing.** Delegations can only narrow, never widen. Root grants `[build, test, deploy.staging]`. Sub-delegation can grant `[deploy.staging]` but cannot add `deploy.prod`. Enforced by the math, not by policy.
 
-**Token format.** Base64-encoded JSON containing the delegation chain, agent DID, scopes, and expiry. Each link in the chain includes the issuer's public key and signature. Self-contained, verifiable offline.
+**Offline verification.** Base64-encoded JSON tokens containing the delegation chain, agent DID, scopes, and expiry. Each chain link includes the issuer's public key and signature. Verifiable anywhere.
 
-## Competitive Landscape
-
-| Feature | Vault | OPA | GH OIDC | AWS IAM | kanoniv-auth |
-|---------|-------|-----|---------|---------|-------------|
-| Secret management | Y | N | N | Y | N |
-| Policy engine | N | Y | N | Y | N |
-| Agent-specific delegation | N | N | N | N | **Y** |
-| Scope narrowing chains | N | N | N | N | **Y** |
-| Cryptographic audit trail | N | N | N | N | **Y** |
-| Short-lived tokens | Y | N | Y | Y | **Y** |
-| Offline verification | Y | N | N | N | **Y** |
-| MCP auth | N | N | N | N | **Y** |
-
-None of them have "agent delegates to sub-agent with attenuated scope." That's the gap.
-
-## Architecture
-
-```
-Developer (root key)
-  |
-  +-- Python CLI (pip install kanoniv-auth)
-  +-- Rust CLI (cargo install kanoniv-agent-auth --features cli)
-  +-- GitHub Action (kanoniv/auth-action@v1)
-  |
-  delegate / verify / sign
-  |
-  +-- OFFLINE: local Ed25519 verify (no network)
-  +-- SERVICE: kanoniv-auth serve (Axum + SQLite)
-  +-- CLOUD: api.kanoniv.com (Postgres, revocation webhooks)
-```
-
-## Packages
-
-| Package | Registry | Install |
-|---------|----------|---------|
-| `kanoniv-agent-auth` | crates.io | `cargo install kanoniv-agent-auth --features cli` |
-| `kanoniv-auth` | PyPI | `pip install kanoniv-auth` |
-| `@kanoniv/agent-auth` | npm | `npm install @kanoniv/agent-auth` |
-
-## Agent Trust Observatory
-
-For teams that want a visual dashboard: [trust.kanoniv.com](https://trust.kanoniv.com)
-
-The Observatory shows agent reputation, delegation chains, provenance audit trails, and cross-engine interop verification. Docker Compose for self-hosting:
+## Install
 
 ```bash
-cd apps/observatory && docker compose up
+pip install kanoniv-auth                              # Python SDK + CLI
+kanoniv-auth install-skill                            # Claude Code skills
+kanoniv-auth install-hook                             # Git pre-push enforcement
 ```
 
-## Cross-Engine Interop
+Or with Rust:
 
-Three independent agent systems have cross-verified each other's delegation chains on this repo:
+```bash
+cargo install kanoniv-agent-auth --features cli       # Rust CLI
+```
 
-| Verifier / Chain | Kanoniv | APS | AIP |
-|---|---|---|---|
-| Kanoniv | -- | verified | verified |
-| APS | verified | -- | verified |
-| AIP | verified | verified | -- |
+## Docs
 
-See [spec/CROSS-ENGINE-VERIFICATION.md](spec/CROSS-ENGINE-VERIFICATION.md) and [interop thread](https://github.com/kanoniv/agent-auth/issues/2).
+Full documentation at [auth.kanoniv.com](https://auth.kanoniv.com):
+
+- [Getting Started](https://auth.kanoniv.com/guide/getting-started)
+- [Claude Code Skill](https://auth.kanoniv.com/guide/claude-code-skill)
+- [CLI Reference](https://auth.kanoniv.com/reference/cli)
+- [Python API](https://auth.kanoniv.com/reference/python-api)
+- [Token Format Spec](https://auth.kanoniv.com/reference/token-format)
 
 ## License
 
