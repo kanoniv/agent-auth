@@ -66,6 +66,16 @@ elif printf '%s' "$CMD_LOWER" | grep -qE '^(cat|head|tail|less|more|wc|ls|find|g
   echo '{}'
   exit 0
 
+# Shell test/check commands (always allowed - used by skill setup)
+elif printf '%s' "$CMD_LOWER" | grep -qE '^\[|^test\s|^if\s|^which\s|^command\s' 2>/dev/null; then
+  echo '{}'
+  exit 0
+
+# pip/cargo install (always allowed - needed for setup)
+elif printf '%s' "$CMD_LOWER" | grep -qE '^pip\s+install|^pip3\s+install|^cargo\s+install' 2>/dev/null; then
+  echo '{}'
+  exit 0
+
 # Git read-only (always allowed)
 elif printf '%s' "$CMD_LOWER" | grep -qE 'git\s+(status|log|diff|show|branch|tag|remote|fetch|stash\s+list)' 2>/dev/null; then
   echo '{}'

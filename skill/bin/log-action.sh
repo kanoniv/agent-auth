@@ -2,7 +2,8 @@
 # log-action.sh - PostToolUse hook for /delegate skill
 # Logs every tool action to ~/.kanoniv/audit.log after execution.
 # Reads JSON from stdin with tool_name, tool_input, tool_result.
-set -euo pipefail
+# Must never fail - PostToolUse errors confuse the user.
+set +e
 
 TOKEN_FILE="/tmp/.kanoniv-session-token"
 if [ ! -f "$TOKEN_FILE" ]; then

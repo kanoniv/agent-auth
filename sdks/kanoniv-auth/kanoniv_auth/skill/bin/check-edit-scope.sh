@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-edit-scope.sh - PreToolUse hook for Edit/Write tools
 # Simply verifies code.edit scope is present in the delegation token.
-set -euo pipefail
+set -eo pipefail
 
 TOKEN_FILE="/tmp/.kanoniv-session-token"
 if [ ! -f "$TOKEN_FILE" ]; then

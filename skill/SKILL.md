@@ -50,6 +50,14 @@ Every action is auto-logged to `~/.kanoniv/audit.log`.
 
 ## Setup
 
+First, clear any previous session token so hooks don't interfere with setup:
+
+```bash
+rm -f /tmp/.kanoniv-session-token
+```
+
+Then check prerequisites:
+
 ```bash
 # Install kanoniv-auth if not present
 which kanoniv-auth >/dev/null 2>&1 || pip install kanoniv-auth 2>/dev/null
@@ -58,33 +66,50 @@ which kanoniv-auth >/dev/null 2>&1 || pip install kanoniv-auth 2>/dev/null
 [ -f ~/.kanoniv/root.key ] || kanoniv-auth init
 ```
 
-After the setup block, ask the user what scopes to grant. Use AskUserQuestion:
+After setup, ask TWO questions using AskUserQuestion:
 
-"What should Claude Code be allowed to do this session?"
+**Question 1: Agent name and TTL**
+
+"Name this agent and set the session duration."
+
+Default agent name: `claude-code`. Default TTL: `4h`.
+Let the user type a custom name and/or TTL if they want.
+
+Options:
+- A) claude-code, 4h (Recommended)
+- B) Custom - I'll specify name and TTL
+
+If B: ask for the agent name (string, e.g. "deploy-bot") and TTL (e.g. "2h", "30m", "8h").
+
+**Question 2: Scopes**
+
+"What should {agent_name} be allowed to do this session?"
 
 Options:
 - A) Full dev - code.edit, test.run, git.commit, git.push (Recommended)
 - B) Read-only + test - code.read, test.run
 - C) Custom scopes - I'll specify
 
-If A: run `kanoniv-auth delegate --name claude-code --scopes code.edit,test.run,git.commit,git.push --ttl 4h --export`
-If B: run `kanoniv-auth delegate --name claude-code --scopes code.read,test.run --ttl 4h --export`
-If C: ask for comma-separated scopes, then run delegate with those scopes.
+If C: ask for comma-separated scopes.
 
-Capture the output and parse the token. Store it:
+**Then delegate:**
+
+Run `kanoniv-auth delegate --name {agent_name} --scopes {scopes} --ttl {ttl} --export`
+
+Capture the output, parse the token from the `export KANONIV_TOKEN=...` line.
+Store it:
 
 ```bash
-export KANONIV_TOKEN=<token from delegate output>
-echo "$KANONIV_TOKEN" > /tmp/.kanoniv-session-token
+echo "{token}" > /tmp/.kanoniv-session-token
 ```
 
 Then show the status:
 
 ```bash
-kanoniv-auth status --agent claude-code
+kanoniv-auth status --agent {agent_name}
 ```
 
-Print: "Delegation active. All tool calls will be verified and logged.
+Print: "Delegation active for {agent_name}. All tool calls will be verified and logged.
 Run /audit anytime to see the full trail."
 
 ## Scope Mapping
