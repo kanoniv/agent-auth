@@ -34,7 +34,7 @@ jobs:
       - run: npm test
 
   python:
-    name: Python Tests
+    name: Python PyO3 Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,3 +45,29 @@ jobs:
       - run: python -m venv .venv && source .venv/bin/activate && pip install maturin pytest
       - run: source .venv/bin/activate && cd python && maturin develop
       - run: source .venv/bin/activate && cd python && pytest tests/ -v
+
+  python-sdk:
+    name: Python SDK Tests (kanoniv-auth)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography pytest click
+      - run: cd sdks/kanoniv-auth && pytest tests/ -v
+
+  interop:
+    name: Cross-SDK Interop
+    runs-on: ubuntu-latest
+    needs: [rust, python-sdk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography
+      - run: cargo build --features cli
+      - run: python tests/interop/test_cross_sdk.py
