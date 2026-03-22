@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# kanoniv-auth pre-push hook
+# Verifies git.push.{repo}.{branch} scope before allowing push.
+# Install: kanoniv-auth install-hook
+# Remove: rm .git/hooks/pre-push
+
+set -euo pipefail
+
+# Skip if no kanoniv-auth token is active
+TOKEN_FILE="/tmp/.kanoniv-session-token"
+KANONIV_TOKEN="${KANONIV_TOKEN:-}"
+
+if [ -z "$KANONIV_TOKEN" ] && [ ! -f "$TOKEN_FILE" ]; then
+  # No delegation active - allow push (opt-in enforcement)
+  exit 0
+fi
+
+if [ -z "$KANONIV_TOKEN" ] && [ -f "$TOKEN_FILE" ]; then
+  KANONIV_TOKEN=$(cat "$TOKEN_FILE")
+fi
+
+if [ -z "$KANONIV_TOKEN" ]; then
+  exit 0
+fi
+
+# Get repo name from directory
+REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+
+# Read push info from stdin (remote, url)
+REMOTE="$1"
+URL="$2"
+
+# Read each ref being pushed
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  # Extract branch name from refs/heads/main -> main
+  BRANCH=$(echo "$REMOTE_REF" | sed 's|refs/heads/||')
+
+  # Build hierarchical scope
+  SCOPE="git.push.${REPO_NAME}.${BRANCH}"
+
+  # Try hierarchical verification: specific -> broad
+  VERIFIED=false
+  CHECK_SCOPE="$SCOPE"
+  while true; do
+    if kanoniv-auth verify --scope "$CHECK_SCOPE" --token "$KANONIV_TOKEN" >/dev/null 2>&1; then
+      VERIFIED=true
+      break
+    fi
+    # Try parent scope
+    if [[ "$CHECK_SCOPE" != *.* ]]; then
+      break
+    fi
+    CHECK_SCOPE="${CHECK_SCOPE%.*}"
+  done
+
+  if [ "$VERIFIED" = false ]; then
+    echo ""
+    echo "kanoniv-auth: PUSH DENIED"
+    echo ""
+    echo "  Scope required: $SCOPE"
+    echo "  Repo:           $REPO_NAME"
+    echo "  Branch:         $BRANCH"
+    echo ""
+    SCOPES=$(kanoniv-auth whoami --token "$KANONIV_TOKEN" 2>/dev/null | grep "Scopes:" | sed 's/.*Scopes:\s*//' || echo "unknown")
+    echo "  You have:       $SCOPES"
+    echo ""
+    echo "  To authorize this push:"
+    echo "    kanoniv-auth delegate --scopes $SCOPE --ttl 4h"
+    echo ""
+    exit 1
+  fi
+
+  # Log the push to audit trail
+  kanoniv-auth sign --action "git.push" --token "$KANONIV_TOKEN" \
+    --target "${REPO_NAME}/${BRANCH}" \
+    --result "success" >/dev/null 2>&1 || true
+
+done
+
+exit 0

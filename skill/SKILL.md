@@ -64,7 +64,12 @@ If B: ask for the agent name (string, e.g. "deploy-bot") and TTL (e.g. "2h", "30
 Options:
 - A) Full dev - code.edit, test.run, git.commit, git.push (Recommended)
 - B) Read-only + test - code.read, test.run
-- C) Custom scopes - I'll specify
+- C) Repo-scoped - code.edit, test.run, git.push.{repo}.{branch} (I'll specify repo/branch)
+- D) Custom scopes - I'll specify
+
+If C: detect the current repo name from `basename $(git rev-parse --show-toplevel)` and current
+branch from `git branch --show-current`. Suggest `git.push.{repo}.{branch}` as the scope.
+Ask the user to confirm or modify.
 
 If C: ask for comma-separated scopes.
 
@@ -87,12 +92,17 @@ The hook maps Claude Code tool names to kanoniv-auth scopes:
 
 | Tool | Scope Required |
 |------|---------------|
-| Bash (git push/commit) | git.push, git.commit |
+| Bash (git push origin main) | git.push.{repo}.main (hierarchical) |
+| Bash (git commit) | git.commit.{repo} (hierarchical) |
 | Bash (test commands) | test.run |
 | Bash (other) | code.edit |
 | Edit | code.edit |
 | Write | code.edit |
 | Read | always allowed |
+
+Scopes are hierarchical: `git.push` grants all repos/branches.
+`git.push.agent-auth` grants all branches in agent-auth.
+`git.push.agent-auth.main` grants only main branch in agent-auth.
 
 If a tool call requires a scope the token doesn't have, the hook returns
 a block message explaining what's denied and what scope is needed.

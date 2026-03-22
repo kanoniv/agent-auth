@@ -128,6 +128,67 @@ def install_skill_cmd():
     click.echo("Start Claude Code and type /delegate to begin.")
 
 
+@cli.command("install-hook")
+@click.option("--repo", "-r", default=".", help="Path to git repository")
+@click.option("--force", is_flag=True, help="Overwrite existing pre-push hook")
+def install_hook_cmd(repo: str, force: bool):
+    """Install Git pre-push hook for scope enforcement.
+
+    Adds a pre-push hook that verifies git.push.{repo}.{branch} scope
+    before allowing pushes. Works invisibly - just git push as normal.
+    """
+    from pathlib import Path
+    import shutil
+    import subprocess
+
+    # Find git root
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=repo, capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            click.echo(f"Error: '{repo}' is not a git repository.", err=True)
+            sys.exit(1)
+        git_root = Path(result.stdout.strip())
+    except FileNotFoundError:
+        click.echo("Error: git not found.", err=True)
+        sys.exit(1)
+
+    hooks_dir = git_root / ".git" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook_dest = hooks_dir / "pre-push"
+
+    if hook_dest.exists() and not force:
+        # Check if it's already our hook
+        content = hook_dest.read_text()
+        if "kanoniv-auth" in content:
+            click.echo("kanoniv-auth pre-push hook already installed.")
+            return
+        click.echo(f"A pre-push hook already exists at {hook_dest}. Use --force to overwrite.", err=True)
+        sys.exit(1)
+
+    # Copy our hook
+    hook_src = Path(__file__).parent / "hooks" / "pre-push"
+    if not hook_src.exists():
+        click.echo("Error: hook file not found in package. Reinstall: pip install kanoniv-auth", err=True)
+        sys.exit(1)
+
+    shutil.copy2(hook_src, hook_dest)
+    hook_dest.chmod(0o755)
+
+    repo_name = git_root.name
+    click.secho(f"Installed pre-push hook for {repo_name}", fg="green", bold=True)
+    click.echo()
+    click.echo("  Every git push will now verify scope before pushing.")
+    click.echo(f"  Required scope format: git.push.{repo_name}.<branch>")
+    click.echo()
+    click.echo("  Example delegation:")
+    click.echo(f"    kanoniv-auth delegate --scopes git.push.{repo_name}.main --ttl 4h")
+    click.echo()
+    click.echo("  Remove: rm .git/hooks/pre-push")
+
+
 @cli.command("delegate")
 @click.option("--scopes", "-s", required=True, help="Comma-separated scopes")
 @click.option("--ttl", "-t", default=None, help='Time-to-live (e.g. "4h", "30m")')
