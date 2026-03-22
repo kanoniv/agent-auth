@@ -1,6 +1,6 @@
 ---
 name: delegate
-version: 0.1.0
+version: 0.2.0
 description: |
   Cryptographic delegation for AI agents. Scope-confines what Claude Code can do
   in this session using Ed25519 delegation tokens. Every action is verified before
@@ -27,12 +27,26 @@ hooks:
         - type: command
           command: "bash ${CLAUDE_SKILL_DIR}/bin/check-edit-scope.sh"
           statusMessage: "Verifying edit scope..."
+  PostToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
+    - matcher: "Edit"
+      hooks:
+        - type: command
+          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
 ---
 
 # /delegate - Cryptographic Scope Enforcement
 
 Sudo for AI agents. This session is now running under a cryptographic delegation
 token. Every tool call is verified against your authorized scopes before execution.
+Every action is auto-logged to `~/.kanoniv/audit.log`.
 
 ## Setup
 
@@ -70,8 +84,8 @@ Then show the status:
 kanoniv-auth status --agent claude-code
 ```
 
-Print: "Delegation active. All tool calls will be verified against your authorized scopes.
-Run /audit anytime to see what happened."
+Print: "Delegation active. All tool calls will be verified and logged.
+Run /audit anytime to see the full trail."
 
 ## Scope Mapping
 
@@ -84,34 +98,59 @@ The hook maps Claude Code tool names to kanoniv-auth scopes:
 | Bash (other) | code.edit |
 | Edit | code.edit |
 | Write | code.edit |
-| Read | code.read (always allowed) |
+| Read | always allowed |
 
 If a tool call requires a scope the token doesn't have, the hook returns
 a block message explaining what's denied and what scope is needed.
 
 ## During the Session
 
-The PreToolUse hook runs on every Bash, Edit, and Write call. It:
+**PreToolUse** hook runs on every Bash, Edit, and Write call:
 1. Reads the tool input from stdin (JSON)
 2. Maps the tool/command to a required scope
-3. Runs `kanoniv-auth verify --scope <required> --agent claude-code`
+3. Runs `kanoniv-auth verify --scope <required>`
 4. If PASS: returns `{}` (allow)
-5. If DENIED: returns `{"permissionDecision":"block","message":"DENIED: ..."}` with the scope violation details
+5. If DENIED: returns `{"permissionDecision":"block","message":"DENIED: ..."}` with scope violation details
 
-This is invisible to the user unless a scope violation occurs.
+**PostToolUse** hook runs after every allowed action:
+1. Logs the tool name, command/file, and result to `~/.kanoniv/audit.log`
+2. Silent - no output to the user
+
+Both hooks are invisible unless a scope violation occurs.
+
+## Audit Trail
+
+Every tool call that passes scope verification is auto-logged:
+
+```
+2026-03-22 19:15:03  claude-code  did:agent:5e06...  tool:bash   git commit -m "feat: ..."         ok
+2026-03-22 19:15:05  claude-code  did:agent:5e06...  tool:bash   cargo test --lib                   ok
+2026-03-22 19:15:08  claude-code  did:agent:5e06...  tool:edit   src/lib.rs                         ok
+2026-03-22 19:15:12  claude-code  did:agent:5e06...  tool:bash   git push origin main               DENIED
+```
+
+View anytime:
+
+```bash
+kanoniv-auth audit-log --agent claude-code
+```
 
 ## /audit
 
-When the user runs /audit, show the session audit log:
+When the user types /audit or asks to see what happened, run:
 
 ```bash
 kanoniv-auth audit-log --agent claude-code --since $(date -u +%Y-%m-%dT00:00:00)
 ```
 
+Show the output formatted. If no entries, say "No actions logged yet this session."
+
 ## /status
 
-When the user runs /status, show the current delegation:
+When the user types /status or asks about current delegation, run:
 
 ```bash
 kanoniv-auth status --agent claude-code
 ```
+
+Show the output. If expired, suggest re-delegating.
