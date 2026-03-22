@@ -111,7 +111,12 @@ fn init_db(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
     )
 }
 
-fn log_audit(conn: &rusqlite::Connection, action: &str, delegation_id: Option<&str>, details: &str) {
+fn log_audit(
+    conn: &rusqlite::Connection,
+    action: &str,
+    delegation_id: Option<&str>,
+    details: &str,
+) {
     let _ = conn.execute(
         "INSERT INTO audit_log (timestamp, action, delegation_id, details) VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![
@@ -134,7 +139,9 @@ async fn handle_delegate(
     }
 
     let agent_keys = AgentKeyPair::generate();
-    let agent_did = req.agent_did.unwrap_or_else(|| agent_keys.identity().did.clone());
+    let agent_did = req
+        .agent_did
+        .unwrap_or_else(|| agent_keys.identity().did.clone());
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
@@ -215,8 +222,7 @@ async fn handle_verify(
                 }
             }
 
-            let scopes: Vec<String> =
-                serde_json::from_str(&scopes_json).unwrap_or_default();
+            let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
 
             if !scopes.contains(&req.scope) {
                 let msg = format!(
@@ -294,7 +300,9 @@ async fn handle_list(
 ) -> impl IntoResponse {
     let db = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-    let mut sql = "SELECT id, agent_did, scopes, created_at, expires_at, revoked FROM delegations WHERE 1=1".to_string();
+    let mut sql =
+        "SELECT id, agent_did, scopes, created_at, expires_at, revoked FROM delegations WHERE 1=1"
+            .to_string();
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
 
     if let Some(ref did) = query.agent_did {
@@ -308,19 +316,21 @@ async fn handle_list(
 
     let mut stmt = db.prepare(&sql).unwrap();
     let records: Vec<DelegationRecord> = stmt
-        .query_map(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())), |row| {
-            let scopes_json: String = row.get(2)?;
-            let scopes: Vec<String> =
-                serde_json::from_str(&scopes_json).unwrap_or_default();
-            Ok(DelegationRecord {
-                id: row.get(0)?,
-                agent_did: row.get(1)?,
-                scopes,
-                created_at: row.get(3)?,
-                expires_at: row.get(4)?,
-                revoked: row.get(5)?,
-            })
-        })
+        .query_map(
+            rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+            |row| {
+                let scopes_json: String = row.get(2)?;
+                let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
+                Ok(DelegationRecord {
+                    id: row.get(0)?,
+                    agent_did: row.get(1)?,
+                    scopes,
+                    created_at: row.get(3)?,
+                    expires_at: row.get(4)?,
+                    revoked: row.get(5)?,
+                })
+            },
+        )
         .unwrap()
         .filter_map(|r| r.ok())
         .collect();
@@ -468,11 +478,7 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
 
 // --- Server startup ---
 
-pub async fn run_server(
-    port: u16,
-    db_path: &str,
-    root_key_path: &str,
-) -> Result<(), String> {
+pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result<(), String> {
     // Load root key
     let data: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(root_key_path)
@@ -491,8 +497,8 @@ pub async fn run_server(
     let root_identity = keypair.identity();
 
     // Open SQLite
-    let conn = rusqlite::Connection::open(db_path)
-        .map_err(|e| format!("Failed to open database: {e}"))?;
+    let conn =
+        rusqlite::Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
         .map_err(|e| format!("Failed to set pragmas: {e}"))?;
     init_db(&conn).map_err(|e| format!("Failed to init database: {e}"))?;

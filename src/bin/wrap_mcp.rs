@@ -38,8 +38,7 @@ impl WrapMode {
 
 fn load_root_identity(path: &str) -> Result<AgentIdentity, String> {
     let data: Value = serde_json::from_str(
-        &std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read root key: {e}"))?,
+        &std::fs::read_to_string(path).map_err(|e| format!("Failed to read root key: {e}"))?,
     )
     .map_err(|e| format!("Invalid key file: {e}"))?;
 
@@ -57,11 +56,9 @@ fn load_root_identity(path: &str) -> Result<AgentIdentity, String> {
 fn verify_proof(args: &Value, root_identity: &AgentIdentity) -> Result<String, String> {
     let (proof, _clean) = McpProof::extract(args);
     match proof {
-        Some(p) => {
-            kanoniv_agent_auth::mcp::verify_mcp_call(&p, root_identity)
-                .map(|result| result.invoker_did.clone())
-                .map_err(|e| format!("{e}"))
-        }
+        Some(p) => kanoniv_agent_auth::mcp::verify_mcp_call(&p, root_identity)
+            .map(|result| result.invoker_did.clone())
+            .map_err(|e| format!("{e}")),
         None => Err("no proof attached".to_string()),
     }
 }
@@ -217,10 +214,7 @@ pub fn run_wrapper(
                     }
                     WrapMode::Warn => {
                         if !has_proof {
-                            eprintln!(
-                                "[kanoniv-auth] WARNING: {} - no proof attached",
-                                tool_name
-                            );
+                            eprintln!("[kanoniv-auth] WARNING: {} - no proof attached", tool_name);
                         } else if let Some(ref root_id) = root_identity {
                             match verify_proof(&args, root_id) {
                                 Ok(did) => eprintln!(
@@ -234,10 +228,7 @@ pub fn run_wrapper(
                                 ),
                             }
                         } else {
-                            eprintln!(
-                                "[kanoniv-auth] OK: {} - proof present",
-                                tool_name
-                            );
+                            eprintln!("[kanoniv-auth] OK: {} - proof present", tool_name);
                         }
                     }
                     WrapMode::Audit => {

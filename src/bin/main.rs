@@ -11,9 +11,9 @@ use clap::{Parser, Subcommand};
 use colored::*;
 use kanoniv_agent_auth::{AgentKeyPair, Caveat, Delegation, SignedMessage};
 
-mod wrap_mcp;
 #[cfg(feature = "server")]
 mod server;
+mod wrap_mcp;
 
 #[derive(Parser)]
 #[command(
@@ -155,12 +155,10 @@ fn main() {
             mode,
             root_key,
             command,
-        } => {
-            match wrap_mcp::WrapMode::from_str(&mode) {
-                Ok(wrap_mode) => wrap_mcp::run_wrapper(command, wrap_mode, root_key),
-                Err(e) => Err(e),
-            }
-        }
+        } => match wrap_mcp::WrapMode::from_str(&mode) {
+            Ok(wrap_mode) => wrap_mcp::run_wrapper(command, wrap_mode, root_key),
+            Err(e) => Err(e),
+        },
         #[cfg(feature = "server")]
         Commands::Serve { port, db, key } => {
             let key_path = key
@@ -397,13 +395,12 @@ fn cmd_delegate(
         let signing_keys = keypair_from_b64(priv_key_b64)?;
         let agent_keys = AgentKeyPair::generate();
 
-        let delegation = Delegation::create_root(&signing_keys, &agent_keys.identity().did, caveats)
-            .map_err(|e| format!("Delegation failed: {e}"))?;
+        let delegation =
+            Delegation::create_root(&signing_keys, &agent_keys.identity().did, caveats)
+                .map_err(|e| format!("Delegation failed: {e}"))?;
 
-        let mut parent_chain: Vec<serde_json::Value> = parent_data["chain"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let mut parent_chain: Vec<serde_json::Value> =
+            parent_data["chain"].as_array().cloned().unwrap_or_default();
         let link =
             serde_json::to_value(&delegation).map_err(|e| format!("Serialization error: {e}"))?;
         parent_chain.push(link);
@@ -470,7 +467,11 @@ fn cmd_verify(scope: String, token: String) -> Result<(), String> {
         if now > expires {
             return Err(format!(
                 "{}\n\n  Re-delegate:\n    kanoniv-auth delegate --scopes {} --ttl <ttl>",
-                format!("EXPIRED: token expired {} ago", format_duration(now - expires)).red(),
+                format!(
+                    "EXPIRED: token expired {} ago",
+                    format_duration(now - expires)
+                )
+                .red(),
                 token_scopes.join(",")
             ));
         }
@@ -529,8 +530,8 @@ fn cmd_sign(action: String, token: String, target: String, result: String) -> Re
         "chain_depth": data["chain"].as_array().map(|a| a.len()).unwrap_or(0),
     });
 
-    let signed = SignedMessage::sign(&agent_keys, envelope)
-        .map_err(|e| format!("Signing failed: {e}"))?;
+    let signed =
+        SignedMessage::sign(&agent_keys, envelope).map_err(|e| format!("Signing failed: {e}"))?;
 
     let mut output =
         serde_json::to_value(&signed).map_err(|e| format!("Serialization error: {e}"))?;
@@ -570,9 +571,15 @@ fn cmd_whoami(token: String) -> Result<(), String> {
         let now = chrono::Utc::now().timestamp() as f64;
         let remaining = expires - now;
         if remaining > 0.0 {
-            println!("  TTL:     {}", format!("{} remaining", format_duration(remaining)).green());
+            println!(
+                "  TTL:     {}",
+                format!("{} remaining", format_duration(remaining)).green()
+            );
         } else {
-            println!("  TTL:     {}", format!("expired {} ago", format_duration(-remaining)).red());
+            println!(
+                "  TTL:     {}",
+                format!("expired {} ago", format_duration(-remaining)).red()
+            );
         }
     } else {
         println!("  TTL:     no expiry");
@@ -593,10 +600,7 @@ fn cmd_audit(data_str: String) -> Result<(), String> {
     // Detect execution envelope vs delegation token
     if data.get("action").is_some() {
         println!("{}", "Execution Envelope".bold());
-        println!(
-            "  Agent:   {}",
-            data["agent_did"].as_str().unwrap_or("?")
-        );
+        println!("  Agent:   {}", data["agent_did"].as_str().unwrap_or("?"));
         println!("  Action:  {}", data["action"].as_str().unwrap_or("?"));
         println!("  Target:  {}", data["target"].as_str().unwrap_or(""));
         println!("  Result:  {}", data["result"].as_str().unwrap_or("?"));
