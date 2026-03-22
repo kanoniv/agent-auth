@@ -36,3 +36,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdks/kanoniv-auth/dist/
+          verbose: true
