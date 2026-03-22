@@ -73,10 +73,14 @@ def delegate(
     scopes: list[str],
     ttl: str | float | None = None,
     to: str | None = None,
+    name: str | None = None,
     root: KeyPair | None = None,
     parent_token: str | None = None,
 ) -> str:
     """Issue a delegation token.
+
+    If ``name`` is provided, the agent gets a persistent identity from the
+    local registry. Same name = same DID across sessions.
 
     Returns a base64-encoded JSON token interoperable with the Rust CLI
     and delegation service.
@@ -117,6 +121,10 @@ def delegate(
     if to:
         agent_did = to
         agent_keys = None
+    elif name:
+        from kanoniv_auth.registry import register_agent
+        agent_keys = register_agent(name)
+        agent_did = agent_keys.did
     else:
         agent_keys = generate_keys()
         agent_did = agent_keys.did
@@ -189,6 +197,8 @@ def delegate(
     }
     if expires_at is not None:
         token_data["expires_at"] = expires_at
+    if name:
+        token_data["agent_name"] = name
 
     # Embed agent keys for sub-delegation and signing
     if agent_keys is not None:

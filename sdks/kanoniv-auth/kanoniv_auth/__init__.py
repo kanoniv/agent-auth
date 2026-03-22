@@ -19,6 +19,7 @@ from kanoniv_auth.errors import (
     TokenParseError,
 )
 from kanoniv_auth.crypto import KeyPair, generate_keys, load_keys
+from kanoniv_auth.registry import register_agent, get_agent, list_agents, resolve_name
 
 __version__ = "0.2.0"
 __all__ = [
@@ -29,6 +30,10 @@ __all__ = [
     "load_root",
     "load_token",
     "list_tokens",
+    "register_agent",
+    "get_agent",
+    "list_agents",
+    "resolve_name",
     "AuthError",
     "ScopeViolation",
     "TokenExpired",
