@@ -54,7 +54,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install cryptography pytest click
+      - run: cd sdks/kanoniv-auth && pip install -e ".[cli,dev]"
       - run: cd sdks/kanoniv-auth && pytest tests/ -v
 
   interop:
@@ -68,6 +68,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install cryptography
+      - run: cd sdks/kanoniv-auth && pip install -e .
       - run: cargo build --features cli
       - run: python tests/interop/test_cross_sdk.py
