@@ -135,22 +135,7 @@ View anytime:
 kanoniv-auth audit-log --agent claude-code
 ```
 
-## /audit
+## Related Skills
 
-When the user types /audit or asks to see what happened, run:
-
-```bash
-kanoniv-auth audit-log --agent claude-code --since $(date -u +%Y-%m-%dT00:00:00)
-```
-
-Show the output formatted. If no entries, say "No actions logged yet this session."
-
-## /status
-
-When the user types /status or asks about current delegation, run:
-
-```bash
-kanoniv-auth status --agent claude-code
-```
-
-Show the output. If expired, suggest re-delegating.
+- `/audit` - View the full audit trail (separate skill)
+- `/status` - Check current delegation status (separate skill)
