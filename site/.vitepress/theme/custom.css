@@ -1,0 +1,255 @@
+/* Kanoniv brand theme for VitePress */
+
+:root {
+  /* Brand colors */
+  --kanoniv-gold: #C5A572;
+  --kanoniv-gold-hover: #D4BC94;
+  --kanoniv-gold-dim: rgba(197, 165, 114, 0.1);
+  --kanoniv-gold-border: rgba(197, 165, 114, 0.2);
+
+  --kanoniv-bg: #0a0a0f;
+  --kanoniv-surface: #12121a;
+  --kanoniv-elevated: #1a1a25;
+
+  --kanoniv-text: #E8E8ED;
+  --kanoniv-text-2: #8B8B96;
+  --kanoniv-text-3: #55555F;
+
+  --kanoniv-border: rgba(255, 255, 255, 0.07);
+  --kanoniv-border-subtle: rgba(255, 255, 255, 0.03);
+
+  --kanoniv-success: #34D399;
+  --kanoniv-danger: #F87171;
+}
+
+/* Force dark mode */
+.dark {
+  --vp-c-bg: var(--kanoniv-bg);
+  --vp-c-bg-alt: var(--kanoniv-surface);
+  --vp-c-bg-elv: var(--kanoniv-elevated);
+  --vp-c-bg-soft: var(--kanoniv-surface);
+
+  --vp-c-default-1: var(--kanoniv-text-3);
+  --vp-c-default-2: rgba(255, 255, 255, 0.07);
+  --vp-c-default-3: rgba(255, 255, 255, 0.04);
+  --vp-c-default-soft: rgba(255, 255, 255, 0.03);
+
+  --vp-c-brand-1: var(--kanoniv-gold);
+  --vp-c-brand-2: var(--kanoniv-gold-hover);
+  --vp-c-brand-3: var(--kanoniv-gold);
+  --vp-c-brand-soft: var(--kanoniv-gold-dim);
+
+  --vp-c-text-1: var(--kanoniv-text);
+  --vp-c-text-2: var(--kanoniv-text-2);
+  --vp-c-text-3: var(--kanoniv-text-3);
+
+  --vp-c-divider: var(--kanoniv-border);
+
+  --vp-button-brand-bg: var(--kanoniv-gold);
+  --vp-button-brand-hover-bg: var(--kanoniv-gold-hover);
+  --vp-button-brand-text: #0a0a0f;
+  --vp-button-brand-active-bg: var(--kanoniv-gold);
+
+  --vp-button-alt-bg: var(--kanoniv-surface);
+  --vp-button-alt-hover-bg: var(--kanoniv-elevated);
+  --vp-button-alt-text: var(--kanoniv-text);
+  --vp-button-alt-border: var(--kanoniv-border);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, var(--kanoniv-gold) 0%, var(--kanoniv-gold-hover) 100%);
+  --vp-home-hero-image-background-image: radial-gradient(circle, var(--kanoniv-gold-dim) 0%, transparent 70%);
+
+  --vp-c-tip-1: var(--kanoniv-gold);
+  --vp-c-tip-2: var(--kanoniv-gold-border);
+  --vp-c-tip-3: var(--kanoniv-gold-dim);
+  --vp-c-tip-soft: var(--kanoniv-gold-dim);
+
+  --vp-c-warning-1: #FBBF24;
+  --vp-c-warning-soft: rgba(251, 191, 36, 0.1);
+
+  --vp-code-block-bg: var(--kanoniv-surface);
+  --vp-code-bg: rgba(255, 255, 255, 0.05);
+
+  --vp-sidebar-bg-color: var(--kanoniv-bg);
+
+  --vp-nav-bg-color: var(--kanoniv-bg);
+}
+
+/* Hero section */
+.VPHero .name {
+  font-weight: 800 !important;
+}
+
+.VPHero .text {
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, var(--kanoniv-text) 0%, var(--kanoniv-text-2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.VPHero .tagline {
+  color: var(--kanoniv-text-2) !important;
+  font-size: 1.1rem !important;
+}
+
+/* Feature cards */
+.VPFeature {
+  background: var(--kanoniv-surface) !important;
+  border: 1px solid var(--kanoniv-border) !important;
+  border-radius: 12px !important;
+  transition: border-color 0.2s ease !important;
+}
+
+.VPFeature:hover {
+  border-color: var(--kanoniv-gold-border) !important;
+}
+
+.VPFeature .title {
+  color: var(--kanoniv-text) !important;
+  font-weight: 600 !important;
+}
+
+.VPFeature .details {
+  color: var(--kanoniv-text-2) !important;
+  font-size: 0.85rem !important;
+  line-height: 1.5 !important;
+}
+
+/* Nav bar */
+.VPNav {
+  background: var(--kanoniv-bg) !important;
+  border-bottom: 1px solid var(--kanoniv-border) !important;
+}
+
+.VPNavBar {
+  background: var(--kanoniv-bg) !important;
+  border-bottom-color: var(--kanoniv-border) !important;
+}
+
+/* Sidebar */
+.VPSidebar {
+  background: var(--kanoniv-bg) !important;
+  border-right-color: var(--kanoniv-border) !important;
+}
+
+.VPSidebarItem .link.active {
+  color: var(--kanoniv-gold) !important;
+  border-left-color: var(--kanoniv-gold) !important;
+}
+
+/* Code blocks */
+.vp-doc div[class*='language-'] {
+  background: var(--kanoniv-surface) !important;
+  border: 1px solid var(--kanoniv-border) !important;
+  border-radius: 8px !important;
+}
+
+/* Inline code */
+.vp-doc :not(pre) > code {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--kanoniv-gold) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+}
+
+/* Tables */
+.vp-doc table {
+  border-collapse: collapse !important;
+}
+
+.vp-doc th {
+  background: var(--kanoniv-surface) !important;
+  color: var(--kanoniv-text-2) !important;
+  font-size: 0.8rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.vp-doc td {
+  border-color: var(--kanoniv-border) !important;
+}
+
+.vp-doc tr:nth-child(2n) {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Links */
+.vp-doc a {
+  color: var(--kanoniv-gold) !important;
+  text-decoration: none !important;
+}
+
+.vp-doc a:hover {
+  color: var(--kanoniv-gold-hover) !important;
+  text-decoration: underline !important;
+}
+
+/* Search */
+.DocSearch {
+  --docsearch-primary-color: var(--kanoniv-gold) !important;
+  --docsearch-modal-background: var(--kanoniv-bg) !important;
+}
+
+/* Footer */
+.VPFooter {
+  border-top-color: var(--kanoniv-border) !important;
+  background: var(--kanoniv-bg) !important;
+}
+
+/* Custom sections on landing page */
+.demo-section,
+.workflow-section,
+.comparison-table,
+.install-section {
+  border-bottom: 1px solid var(--kanoniv-border);
+}
+
+.demo-section h2,
+.workflow-section h2,
+.comparison-table h2,
+.install-section h2 {
+  color: var(--kanoniv-text) !important;
+}
+
+.demo-section .subtitle {
+  color: var(--kanoniv-text-2) !important;
+}
+
+/* Button hover on landing */
+.VPButton.brand:hover {
+  background: var(--kanoniv-gold-hover) !important;
+}
+
+/* Tip/warning boxes */
+.vp-doc .custom-block.tip {
+  border-color: var(--kanoniv-gold-border) !important;
+  background: var(--kanoniv-gold-dim) !important;
+}
+
+.vp-doc .custom-block.tip .custom-block-title {
+  color: var(--kanoniv-gold) !important;
+}
+
+.vp-doc .custom-block.warning {
+  border-color: rgba(251, 191, 36, 0.2) !important;
+  background: rgba(251, 191, 36, 0.05) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--kanoniv-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kanoniv-text-3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kanoniv-text-2);
+}
