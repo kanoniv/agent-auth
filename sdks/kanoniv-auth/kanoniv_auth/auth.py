@@ -94,8 +94,8 @@ def delegate(
         parent_chain = parent.get("chain", [])
         parent_scopes = parent.get("scopes", [])
 
-        # Sub-delegation can only narrow
-        invalid = [s for s in scopes if s not in parent_scopes]
+        # Sub-delegation can only narrow (hierarchical: git.push covers git.push.repo)
+        invalid = [s for s in scopes if not _scope_matches(s, parent_scopes)]
         if invalid:
             raise ScopeViolation(
                 scope=invalid[0],
@@ -245,9 +245,9 @@ def verify(
     if expires_at is not None and now > expires_at:
         raise TokenExpired(now - expires_at)
 
-    # Check scope
+    # Check scope (hierarchical: git.push grants git.push.repo.branch)
     token_scopes = data.get("scopes", [])
-    if action not in token_scopes:
+    if not _scope_matches(action, token_scopes):
         root_link = chain[0] if chain else {}
         raise ScopeViolation(
             scope=action,
@@ -451,6 +451,26 @@ def list_tokens() -> list[dict]:
         except Exception:
             pass
     return tokens
+
+
+# --- Scope matching ---
+
+def _scope_matches(action: str, token_scopes: list[str]) -> bool:
+    """Check if an action is covered by the token's scopes.
+
+    Hierarchical: a scope of "git.push" covers "git.push.myrepo.main".
+    A scope of "git.push.myrepo" covers "git.push.myrepo.main" but NOT "git.push.other".
+    Exact match always works: "code.edit" covers "code.edit".
+    """
+    for scope in token_scopes:
+        if action == scope:
+            return True
+        # Hierarchical: scope is a prefix of the action
+        if action.startswith(scope + "."):
+            return True
+        # Reverse: action is a parent of a granted scope (not allowed -
+        # you can't use git.push if you only have git.push.myrepo)
+    return False
 
 
 # --- Token encoding ---
