@@ -95,7 +95,17 @@ fn check_auth(
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "));
         match provided {
-            Some(key) if key == expected => None,
+            // Constant-time comparison to prevent timing attacks on the API key
+            Some(key)
+                if key.len() == expected.len()
+                    && key
+                        .bytes()
+                        .zip(expected.bytes())
+                        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                        == 0 =>
+            {
+                None
+            }
             _ => Some((
                 StatusCode::UNAUTHORIZED,
                 Json(ApiResponse {
@@ -349,15 +359,15 @@ async fn handle_verify(
         .into_response();
     }
 
-    // Verify chain signatures
+    // Verify chain signatures cryptographically
     let chain = data["chain"].as_array();
     if chain.is_none() || chain.unwrap().is_empty() {
         return error_response("token has no delegation chain").into_response();
     }
+    let chain_links = chain.unwrap();
 
     // Check root DID matches
-    let chain_root = chain
-        .unwrap()
+    let chain_root = chain_links
         .first()
         .and_then(|l| l["issuer_did"].as_str())
         .unwrap_or("");
@@ -367,6 +377,64 @@ async fn handle_verify(
             chain_root, state.root_did
         ))
         .into_response();
+    }
+
+    // Verify each chain link's Ed25519 signature using embedded public keys
+    for (i, link) in chain_links.iter().enumerate() {
+        // Deserialize the delegation link
+        let delegation: kanoniv_agent_auth::Delegation = match serde_json::from_value(link.clone())
+        {
+            Ok(d) => d,
+            Err(e) => {
+                return error_response(&format!("invalid chain link {i}: {e}")).into_response()
+            }
+        };
+
+        // Reconstruct issuer identity from embedded public key
+        let issuer_identity =
+            match kanoniv_agent_auth::AgentIdentity::from_bytes(&delegation.issuer_public_key) {
+                Ok(id) => id,
+                Err(_) => {
+                    return error_response(&format!(
+                        "chain link {i}: invalid embedded public key for '{}'",
+                        delegation.issuer_did
+                    ))
+                    .into_response()
+                }
+            };
+
+        // Verify the embedded public key matches the claimed DID
+        if issuer_identity.did != delegation.issuer_did {
+            return error_response(&format!(
+                "chain link {i}: public key produces DID '{}' but claims '{}'",
+                issuer_identity.did, delegation.issuer_did
+            ))
+            .into_response();
+        }
+
+        // Verify the Ed25519 signature
+        if let Err(e) = delegation.proof.verify(&issuer_identity) {
+            return error_response(&format!(
+                "chain link {i}: signature verification failed: {e}"
+            ))
+            .into_response();
+        }
+
+        // Verify chain linkage: each link's issuer must be the previous link's delegate
+        if i > 0 {
+            let prev_delegate = chain_links[i - 1]
+                .get("delegate_did")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if delegation.issuer_did != prev_delegate {
+                return error_response(&format!(
+                    "chain link {i}: issuer '{}' is not the delegate of link {}",
+                    delegation.issuer_did,
+                    i - 1
+                ))
+                .into_response();
+            }
+        }
     }
 
     let ttl_remaining = data["expires_at"]
@@ -401,7 +469,7 @@ async fn handle_verify(
         agent_did,
         root_did: state.root_did.clone(),
         scopes: token_scopes,
-        chain_depth: chain.unwrap().len(),
+        chain_depth: chain_links.len(),
         ttl_remaining,
     })
     .into_response()
@@ -626,6 +694,7 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
     let mut audit_stmt = db
         .prepare("SELECT timestamp, action, agent_did, scope, details FROM audit_log ORDER BY id DESC LIMIT 10")
         .unwrap();
+    #[allow(clippy::type_complexity)]
     let audit_rows: Vec<(
         String,
         String,
@@ -647,7 +716,7 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
         .collect();
 
     let mut audit_table = String::new();
-    for (ts, action, agent, scope, details) in &audit_rows {
+    for (ts, action, agent, scope, _details) in &audit_rows {
         let action_color = match action.as_str() {
             "delegate" => "#3fb950",
             "verify" => "#58a6ff",
@@ -805,4 +874,368 @@ pub async fn run_server(
         .map_err(|e| format!("Server error: {e}"))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+#[cfg(feature = "server")]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    /// Build an AppState with an in-memory SQLite DB and a freshly generated root keypair.
+    /// Returns (AppState, root_keypair_clone) so tests can reference the root DID.
+    fn test_state(api_key: Option<String>) -> AppState {
+        let conn = rusqlite::Connection::open_in_memory().expect("open in-memory db");
+        init_db(&conn).expect("init db");
+        let root_keypair = AgentKeyPair::generate();
+        let root_did = root_keypair.identity().did.clone();
+        AppState {
+            db: Arc::new(Mutex::new(conn)),
+            root_keypair: Arc::new(root_keypair),
+            root_did,
+            api_key,
+        }
+    }
+
+    /// Build the same router that run_server() uses.
+    fn test_router(state: AppState) -> Router {
+        Router::new()
+            .route("/delegate", post(handle_delegate))
+            .route("/verify", post(handle_verify))
+            .route("/revoke", post(handle_revoke))
+            .route("/delegations", get(handle_list))
+            .route("/health", get(handle_health))
+            .route("/metrics", get(handle_metrics))
+            .route("/dashboard", get(handle_dashboard))
+            .route("/", get(handle_dashboard))
+            .layer(CorsLayer::permissive())
+            .with_state(state)
+    }
+
+    /// Helper: send a POST request with a JSON body and return (status, parsed JSON).
+    async fn post_json(
+        app: &mut Router,
+        path: &str,
+        body: serde_json::Value,
+        bearer: Option<&str>,
+    ) -> (StatusCode, serde_json::Value) {
+        let mut builder = Request::builder()
+            .method("POST")
+            .uri(path)
+            .header("content-type", "application/json");
+        if let Some(token) = bearer {
+            builder = builder.header("authorization", format!("Bearer {token}"));
+        }
+        let req = builder
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        (status, json)
+    }
+
+    /// Helper: send a GET request and return (status, raw body bytes).
+    async fn get_raw(app: &mut Router, path: &str) -> (StatusCode, Vec<u8>) {
+        let req = Request::builder()
+            .method("GET")
+            .uri(path)
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, bytes.to_vec())
+    }
+
+    /// Helper: delegate with given scopes and optional TTL. Returns the full JSON response data.
+    async fn delegate_scopes(
+        app: &mut Router,
+        scopes: Vec<&str>,
+        ttl_seconds: Option<i64>,
+    ) -> serde_json::Value {
+        let mut body = serde_json::json!({
+            "scopes": scopes,
+        });
+        if let Some(ttl) = ttl_seconds {
+            body["ttl_seconds"] = serde_json::json!(ttl);
+        }
+        let (status, json) = post_json(app, "/delegate", body, None).await;
+        assert_eq!(status, StatusCode::OK, "delegate failed: {json}");
+        assert!(json["ok"].as_bool().unwrap(), "delegate not ok: {json}");
+        json
+    }
+
+    // 1. POST /delegate with valid scopes returns token
+    #[tokio::test]
+    async fn test_delegate_creates_token() {
+        let state = test_state(None);
+        let mut app = test_router(state.clone());
+
+        let json = delegate_scopes(&mut app, vec!["deploy", "build"], None).await;
+        let data = &json["data"];
+
+        assert!(data["delegation_id"].as_str().is_some());
+        assert!(data["agent_did"]
+            .as_str()
+            .unwrap()
+            .starts_with("did:agent:"));
+        assert_eq!(data["scopes"][0].as_str().unwrap(), "deploy");
+        assert_eq!(data["scopes"][1].as_str().unwrap(), "build");
+        assert!(data["token"].as_str().is_some());
+        assert!(!data["token"].as_str().unwrap().is_empty());
+    }
+
+    // 2. POST /delegate with empty scopes returns error
+    #[tokio::test]
+    async fn test_delegate_empty_scopes_fails() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let body = serde_json::json!({"scopes": []});
+        let (status, json) = post_json(&mut app, "/delegate", body, None).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"]
+            .as_str()
+            .unwrap()
+            .contains("scopes cannot be empty"));
+    }
+
+    // 3. Delegate then verify succeeds
+    #[tokio::test]
+    async fn test_verify_valid_token() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let del = delegate_scopes(&mut app, vec!["deploy"], None).await;
+        let token = del["data"]["token"].as_str().unwrap();
+
+        let verify_body = serde_json::json!({
+            "token": token,
+            "scope": "deploy",
+        });
+        let (status, json) = post_json(&mut app, "/verify", verify_body, None).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["ok"].as_bool().unwrap());
+        assert!(json["data"]["valid"].as_bool().unwrap());
+        assert_eq!(json["data"]["chain_depth"].as_u64().unwrap(), 1);
+    }
+
+    // 4. Delegate with scope A, verify with scope B fails
+    #[tokio::test]
+    async fn test_verify_wrong_scope_denied() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let del = delegate_scopes(&mut app, vec!["deploy"], None).await;
+        let token = del["data"]["token"].as_str().unwrap();
+
+        let verify_body = serde_json::json!({
+            "token": token,
+            "scope": "admin",
+        });
+        let (status, json) = post_json(&mut app, "/verify", verify_body, None).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"].as_str().unwrap().contains("DENIED"));
+        assert!(json["error"].as_str().unwrap().contains("admin"));
+    }
+
+    // 5. Delegate with 1-second TTL, wait, verify fails
+    #[tokio::test]
+    async fn test_verify_expired_token() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let del = delegate_scopes(&mut app, vec!["deploy"], Some(1)).await;
+        let token = del["data"]["token"].as_str().unwrap().to_string();
+
+        // Wait for the token to expire
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        let verify_body = serde_json::json!({
+            "token": token,
+            "scope": "deploy",
+        });
+        let (status, json) = post_json(&mut app, "/verify", verify_body, None).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"].as_str().unwrap().contains("EXPIRED"));
+    }
+
+    // 6. Construct a token with fake chain, verify rejects
+    #[tokio::test]
+    async fn test_verify_forged_chain_rejected() {
+        let state = test_state(None);
+        let mut app = test_router(state.clone());
+
+        // Create a legitimate delegation to get the token format right
+        let del = delegate_scopes(&mut app, vec!["deploy"], None).await;
+        let original_token = del["data"]["token"].as_str().unwrap();
+
+        // Decode the token, tamper with the chain by replacing the issuer with a different key
+        let token_data = decode_token(original_token).unwrap();
+
+        // Generate a completely different keypair (attacker)
+        let attacker_keys = AgentKeyPair::generate();
+        let attacker_did = attacker_keys.identity().did.clone();
+
+        // Build a forged chain link that claims to be from the root but signed by the attacker
+        let forged_delegation = Delegation::create_root(
+            &attacker_keys,
+            &token_data["agent_did"].as_str().unwrap(),
+            vec![Caveat::ActionScope(vec!["deploy".into()])],
+        )
+        .unwrap();
+
+        // Replace the chain with the forged one but keep the rest of the token intact
+        let mut forged_token_data = token_data.clone();
+        forged_token_data["chain"] = serde_json::json!([forged_delegation]);
+
+        let forged_b64 = encode_token(&forged_token_data);
+
+        let verify_body = serde_json::json!({
+            "token": forged_b64,
+            "scope": "deploy",
+        });
+        let (status, json) = post_json(&mut app, "/verify", verify_body, None).await;
+
+        // Should be rejected - the forged chain's root DID does not match the server's root DID
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json["ok"].as_bool().unwrap());
+        let error = json["error"].as_str().unwrap();
+        // Either "DENIED: token was issued by" (wrong root DID) or signature failure
+        assert!(
+            error.contains("DENIED") || error.contains("signature"),
+            "unexpected error message: {error}"
+        );
+        // The attacker's DID should NOT match the server root
+        assert_ne!(attacker_did, state.root_did);
+    }
+
+    // 7. Delegate, revoke, then verify fails
+    #[tokio::test]
+    async fn test_revoke_then_verify_denied() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let del = delegate_scopes(&mut app, vec!["deploy"], None).await;
+        let token = del["data"]["token"].as_str().unwrap().to_string();
+        let delegation_id = del["data"]["delegation_id"].as_str().unwrap().to_string();
+
+        // Revoke
+        let revoke_body = serde_json::json!({"delegation_id": delegation_id});
+        let (status, json) = post_json(&mut app, "/revoke", revoke_body, None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["ok"].as_bool().unwrap());
+        assert!(json["data"]["revoked"].as_bool().unwrap());
+
+        // Verify should now fail
+        let verify_body = serde_json::json!({
+            "token": token,
+            "scope": "deploy",
+        });
+        let (status, json) = post_json(&mut app, "/verify", verify_body, None).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"].as_str().unwrap().contains("revoked"));
+    }
+
+    // 8. GET /health returns ok
+    #[tokio::test]
+    async fn test_health_endpoint() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        let (status, body) = get_raw(&mut app, "/health").await;
+        assert_eq!(status, StatusCode::OK);
+
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"].as_str().unwrap(), "ok");
+        assert_eq!(json["service"].as_str().unwrap(), "kanoniv-auth");
+    }
+
+    // 9. GET /metrics returns Prometheus format
+    #[tokio::test]
+    async fn test_metrics_endpoint() {
+        let state = test_state(None);
+        let mut app = test_router(state);
+
+        // Create a delegation first so metrics have something to report
+        delegate_scopes(&mut app, vec!["test"], None).await;
+
+        let (status, body) = get_raw(&mut app, "/metrics").await;
+        assert_eq!(status, StatusCode::OK);
+
+        let text = String::from_utf8(body).unwrap();
+        assert!(text.contains("delegations_total"));
+        assert!(text.contains("delegations_active"));
+        assert!(text.contains("delegations_revoked"));
+        assert!(text.contains("verifications_total"));
+        // Should show at least 1 delegation
+        assert!(text.contains("delegations_total 1"));
+    }
+
+    // 10. If api_key set, delegate without Bearer fails
+    #[tokio::test]
+    async fn test_auth_required_for_delegate() {
+        let state = test_state(Some("secret-key-123".to_string()));
+        let mut app = test_router(state);
+
+        // No auth header
+        let body = serde_json::json!({"scopes": ["deploy"]});
+        let (status, json) = post_json(&mut app, "/delegate", body.clone(), None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"].as_str().unwrap().contains("Unauthorized"));
+
+        // Wrong key
+        let (status, json) =
+            post_json(&mut app, "/delegate", body.clone(), Some("wrong-key")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(!json["ok"].as_bool().unwrap());
+
+        // Correct key
+        let (status, json) = post_json(&mut app, "/delegate", body, Some("secret-key-123")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["ok"].as_bool().unwrap());
+    }
+
+    // 11. If api_key set, revoke without Bearer fails
+    #[tokio::test]
+    async fn test_auth_required_for_revoke() {
+        let state = test_state(Some("my-api-key".to_string()));
+        let mut app = test_router(state);
+
+        // First, create a delegation with proper auth
+        let del_body = serde_json::json!({"scopes": ["deploy"]});
+        let (_, del_json) = post_json(&mut app, "/delegate", del_body, Some("my-api-key")).await;
+        let delegation_id = del_json["data"]["delegation_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // Revoke without auth - should fail
+        let revoke_body = serde_json::json!({"delegation_id": delegation_id});
+        let (status, json) = post_json(&mut app, "/revoke", revoke_body.clone(), None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(!json["ok"].as_bool().unwrap());
+        assert!(json["error"].as_str().unwrap().contains("Unauthorized"));
+
+        // Revoke with correct auth - should succeed
+        let (status, json) = post_json(&mut app, "/revoke", revoke_body, Some("my-api-key")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["ok"].as_bool().unwrap());
+        assert!(json["data"]["revoked"].as_bool().unwrap());
+    }
 }

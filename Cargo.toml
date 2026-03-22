@@ -1,6 +1,6 @@
 [package]
 name = "kanoniv-agent-auth"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 description = "Sudo for AI agents - cryptographic delegation, Ed25519 identity, and signed audit trails"
@@ -37,6 +37,9 @@ tower-http = { version = "0.5", features = ["cors"], optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+tokio = { version = "1", features = ["full"] }
 
 [features]
 default = []
