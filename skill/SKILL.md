@@ -27,19 +27,6 @@ hooks:
         - type: command
           command: "bash ${CLAUDE_SKILL_DIR}/bin/check-edit-scope.sh"
           statusMessage: "Verifying edit scope..."
-  PostToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/log-action.sh"
 ---
 
 # /delegate - Cryptographic Scope Enforcement
