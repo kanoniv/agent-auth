@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kanoniv-auth"
-version = "0.2.4"
+version = "0.2.5"
 description = "Sudo for AI agents. Replace API keys with cryptographic delegation."
 readme = "README.md"
 license = "MIT"
@@ -34,6 +34,3 @@ dev = ["pytest", "pytest-cov"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["kanoniv_auth"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"kanoniv_auth/skill" = "kanoniv_auth/skill"
