@@ -124,6 +124,20 @@ Or with Rust:
 cargo install kanoniv-agent-auth --features cli       # Rust CLI
 ```
 
+## Cross-Engine Interop
+
+Five independent agent systems have cross-verified each other's delegation chains on this repo:
+
+| Engine | Built by | Verified |
+|--------|----------|----------|
+| [Kanoniv](https://github.com/kanoniv/agent-auth) | @dreynow | All 4 engines |
+| [APS](https://github.com/aeoess) (Agent Passport System) | @aeoess | All 4 engines |
+| [AIP](https://github.com/The-Nexus-Guard) (Agent Identity Protocol) | @The-Nexus-Guard | All 4 engines |
+| [Network-AI](https://github.com/Jovancoding) (AuthGuardian) | @Jovancoding | Evaluation layer |
+| [AIM](https://github.com/thebenignhacker) (Agent Identity Manager) | @thebenignhacker | All 4 engines |
+
+Same Ed25519 math, different implementations, mutual verification. See the [interop thread](https://github.com/kanoniv/agent-auth/issues/2) (43+ comments) and [cross-engine verification spec](spec/CROSS-ENGINE-VERIFICATION.md).
+
 ## Docs
 
 Full documentation at [auth.kanoniv.com](https://auth.kanoniv.com):
