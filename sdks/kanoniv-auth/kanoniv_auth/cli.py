@@ -291,7 +291,7 @@ def revoke_cmd(token: str | None, service: str | None, delegation_id: str | None
             sys.exit(1)
     else:
         # Local revoke: delete token file
-        token_dir = Path("~/.kanoniv/tokens").expanduser()
+        token_dir = Path(auth_module.DEFAULT_TOKEN_DIR).expanduser()
         if token:
             # Find and delete the token file matching this token
             deleted = False
