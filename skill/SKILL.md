@@ -37,23 +37,12 @@ Every action is auto-logged to `~/.kanoniv/audit.log`.
 
 ## Setup
 
-First, clear any previous session token so hooks don't interfere with setup:
+Do NOT run bash commands for setup. The PreToolUse hooks are already active
+and will interfere. Instead, go directly to asking the user questions.
+Assume kanoniv-auth is installed (it is if they ran /delegate).
+Assume root key exists (it was created during install or a prior session).
 
-```bash
-rm -f /tmp/.kanoniv-session-token
-```
-
-Then check prerequisites:
-
-```bash
-# Install kanoniv-auth if not present
-which kanoniv-auth >/dev/null 2>&1 || pip install kanoniv-auth 2>/dev/null
-
-# Init root key if not present
-[ -f ~/.kanoniv/root.key ] || kanoniv-auth init
-```
-
-After setup, ask TWO questions using AskUserQuestion:
+Ask TWO questions using AskUserQuestion:
 
 **Question 1: Agent name and TTL**
 
@@ -79,22 +68,15 @@ Options:
 
 If C: ask for comma-separated scopes.
 
-**Then delegate:**
+**Then delegate (single command, minimizes hook triggers):**
 
-Run `kanoniv-auth delegate --name {agent_name} --scopes {scopes} --ttl {ttl} --export`
-
-Capture the output, parse the token from the `export KANONIV_TOKEN=...` line.
-Store it:
+Run this as ONE bash command:
 
 ```bash
-echo "{token}" > /tmp/.kanoniv-session-token
+rm -f /tmp/.kanoniv-session-token && TOKEN=$(kanoniv-auth delegate --name {agent_name} --scopes {scopes} --ttl {ttl}) && echo "$TOKEN" > /tmp/.kanoniv-session-token && kanoniv-auth status --agent {agent_name}
 ```
 
-Then show the status:
-
-```bash
-kanoniv-auth status --agent {agent_name}
-```
+Replace `{agent_name}`, `{scopes}`, and `{ttl}` with the user's choices.
 
 Print: "Delegation active for {agent_name}. All tool calls will be verified and logged.
 Run /audit anytime to see the full trail."
