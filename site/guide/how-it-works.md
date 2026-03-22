@@ -43,6 +43,57 @@ A sub-delegation can only grant a subset of the parent's scopes. If root grants 
 
 This is enforced by the math, not by policy. The chain verifier checks that every link's scopes are a subset of its parent's scopes.
 
+## Hierarchical Scopes
+
+Scopes use dot-separated segments. A parent scope automatically grants access to all child scopes:
+
+```
+git.push                  -- grants all repos, all branches
+git.push.agent-auth       -- grants all branches in agent-auth
+git.push.agent-auth.main  -- grants only main branch in agent-auth
+```
+
+The rule is simple: if the token has scope `X`, any action `X.Y.Z` is allowed. The reverse is not true - having `git.push.agent-auth` does not grant `git.push.other-repo`.
+
+This is enforced in both the Python SDK and the shell hooks:
+
+```python
+# Token has scope: git.push
+verify(action="git.push.agent-auth.main", token=token)  # PASS
+verify(action="git.push.other-repo.dev", token=token)    # PASS
+
+# Token has scope: git.push.agent-auth
+verify(action="git.push.agent-auth.main", token=token)  # PASS
+verify(action="git.push.other-repo.main", token=token)  # DENIED
+```
+
+The git pre-push hook (`kanoniv-auth install-hook`) uses this hierarchy automatically. It builds `git.push.{repo}.{branch}` from the push context and verifies up the scope chain.
+
+## Agent Registry
+
+Agents can have persistent identities that survive across sessions. When you delegate with `--name`, the agent's Ed25519 keypair is stored in `~/.kanoniv/agents.json` and reused every time you delegate to the same name.
+
+```bash
+# First time: generates a new identity
+kanoniv-auth delegate --name claude-code --scopes code.edit --ttl 4h
+# did:agent:5e0641c3749e...
+
+# Second time: same DID
+kanoniv-auth delegate --name claude-code --scopes test.run --ttl 2h
+# did:agent:5e0641c3749e... (same agent, different scopes)
+```
+
+This means audit logs, signed envelopes, and delegation chains all reference the same DID for a given agent name - even across different sessions, different scopes, and different TTLs.
+
+Manage registered agents:
+
+```bash
+kanoniv-auth agents list
+kanoniv-auth agents show claude-code
+kanoniv-auth agents rename claude-code deploy-bot
+kanoniv-auth agents remove old-agent
+```
+
 ## Token Format
 
 Tokens are base64url-encoded JSON:

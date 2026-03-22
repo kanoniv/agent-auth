@@ -16,6 +16,7 @@ from kanoniv_auth import delegate
 token = delegate(
     scopes=["deploy.staging", "build"],  # required
     ttl="4h",                            # optional: "30m", "1d", 3600
+    name="claude-code",                  # optional: persistent agent identity
     to="did:agent:...",                  # optional: delegate to specific DID
     root=keypair,                        # optional: override module-level root
     parent_token="eyJ...",               # optional: sub-delegation
@@ -28,9 +29,12 @@ token = delegate(
 |-----------|------|----------|-------------|
 | `scopes` | `list[str]` | Yes | Scopes to grant. Cannot be empty. |
 | `ttl` | `str \| float \| None` | No | Time-to-live. Strings: `"4h"`, `"30m"`, `"1d"`, `"3600s"`. Numbers: seconds. |
+| `name` | `str \| None` | No | Agent name for persistent identity. Same name = same DID across sessions. Stored in `~/.kanoniv/agents.json`. |
 | `to` | `str \| None` | No | Delegate to a specific DID. If omitted, generates a new agent identity. |
 | `root` | `KeyPair \| None` | No | Root key pair. If omitted, uses module-level key (set by `init_root`/`load_root`). |
 | `parent_token` | `str \| None` | No | Parent token for sub-delegation. Scopes can only narrow. |
+
+**Scope matching is hierarchical.** A scope of `git.push` covers `git.push.myrepo.main`. A scope of `git.push.myrepo` covers `git.push.myrepo.main` but not `git.push.other`. See [How It Works - Hierarchical Scopes](/guide/how-it-works#hierarchical-scopes).
 
 **Returns:** `str` - Base64url-encoded token.
 
@@ -151,6 +155,61 @@ from kanoniv_auth import list_tokens
 
 for t in list_tokens():
     print(t["agent_did"], t["scopes"], t["expired"])
+```
+
+---
+
+## Agent Registry
+
+Persistent named identities stored in `~/.kanoniv/agents.json`. Same name = same DID across sessions.
+
+### `register_agent(name)`
+
+Register a new named agent or return the existing one.
+
+```python
+from kanoniv_auth import register_agent
+
+keys = register_agent("claude-code")
+print(keys.did)  # did:agent:5e0641c3749e...
+```
+
+If the name already exists, returns the existing keypair. If new, generates a fresh Ed25519 keypair and stores it.
+
+### `get_agent(name)`
+
+Get a named agent's keypair, or `None` if not registered.
+
+```python
+from kanoniv_auth import get_agent
+
+keys = get_agent("claude-code")
+if keys:
+    print(keys.did)
+```
+
+### `list_agents()`
+
+List all registered agents.
+
+```python
+from kanoniv_auth import list_agents
+
+for agent in list_agents():
+    print(agent["name"], agent["did"], agent["created_at"])
+```
+
+Returns a list of dicts with `name`, `did`, and `created_at` fields.
+
+### `resolve_name(did)`
+
+Reverse lookup: find the agent name for a DID.
+
+```python
+from kanoniv_auth import resolve_name
+
+name = resolve_name("did:agent:5e0641c3749e...")
+print(name)  # "claude-code" or None
 ```
 
 ---

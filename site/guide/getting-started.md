@@ -99,6 +99,71 @@ print(result["ttl_remaining"])  # 14380.0
 envelope = sign(action="deploy", token=token, target="staging")
 ```
 
+## Named Agents
+
+Give agents persistent identities that survive across sessions. Same name = same DID every time.
+
+```bash
+kanoniv-auth delegate --name claude-code --scopes code.edit,test.run --ttl 4h
+```
+
+```python
+token = delegate(scopes=["code.edit", "test.run"], ttl="4h", name="claude-code")
+```
+
+The name is stored in `~/.kanoniv/agents.json`. Use `kanoniv-auth agents list` to see all registered agents.
+
+## Exec Wrapper
+
+Verify, run, and sign in one shot - the "sudo" experience:
+
+```bash
+kanoniv-auth exec --scope deploy.staging -- ./deploy.sh staging
+```
+
+This does three things:
+1. Verifies the token has `deploy.staging` scope
+2. Runs `./deploy.sh staging`
+3. Signs the result for the audit trail
+
+If the scope check fails, the command never runs.
+
+## Status Check
+
+Quick check on the current delegation:
+
+```bash
+kanoniv-auth status
+```
+
+```
+ACTIVE
+  Agent:  claude-code
+  DID:    did:agent:5e0641c3749e...
+  Scopes: code.edit, test.run
+  TTL:    3h47m
+```
+
+## Audit Log
+
+Every delegate, verify, sign, and exec call is auto-logged to `~/.kanoniv/audit.log`:
+
+```bash
+kanoniv-auth audit-log
+kanoniv-auth audit-log --agent claude-code
+kanoniv-auth audit-log --action verify --since 2026-03-22
+```
+
+## Git Pre-Push Hook
+
+Enforce push scopes at the git level:
+
+```bash
+kanoniv-auth install-hook
+```
+
+Now `git push` verifies `git.push.{repo}.{branch}` scope before allowing the push. If no delegation is active, pushes go through normally (opt-in enforcement).
+
 ## Sub-Delegation
 
 Agents can delegate to other agents. Scopes can only narrow, never widen:
@@ -123,7 +188,8 @@ deploy_token = delegate(
 
 ## What's Next
 
-- [How It Works](/guide/how-it-works) - Ed25519 signatures, delegation chains, token format
+- [How It Works](/guide/how-it-works) - Ed25519 signatures, delegation chains, hierarchical scopes
+- [Claude Code Skill](/guide/claude-code-skill) - Scope enforcement inside Claude Code
 - [GitHub Action](/guide/github-action) - Add to your CI/CD pipeline
 - [Python API Reference](/reference/python-api) - Full API docs
 - [CLI Reference](/reference/cli) - All commands
