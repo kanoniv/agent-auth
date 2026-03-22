@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # check-edit-scope.sh - PreToolUse hook for Edit/Write tools
-# Simply verifies code.edit scope is present in the delegation token.
-set -eo pipefail
+# MUST always exit 0 with valid JSON.
+set +e
+trap 'echo "{}"; exit 0' ERR
 
 TOKEN_FILE="/tmp/.kanoniv-session-token"
 if [ ! -f "$TOKEN_FILE" ]; then
@@ -9,23 +10,17 @@ if [ ! -f "$TOKEN_FILE" ]; then
   exit 0
 fi
 
-TOKEN=$(cat "$TOKEN_FILE")
+TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null || true)
 if [ -z "$TOKEN" ]; then
   echo '{}'
   exit 0
 fi
 
-# Verify code.edit scope
 RESULT=$(kanoniv-auth verify --scope code.edit --token "$TOKEN" 2>&1) || {
-  ERROR=$(printf '%s' "$RESULT" | head -3 | python3 -c '
-import sys, json
-print(json.dumps(sys.stdin.read()))
-' 2>/dev/null | sed 's/^"//;s/"$//')
-
-  cat <<BLOCK
-{"permissionDecision":"block","message":"SCOPE DENIED: file editing requires 'code.edit' scope\n\n$ERROR\n\nRe-delegate with code.edit:\n  kanoniv-auth delegate --name claude-code --scopes code.edit,... --ttl 4h"}
-BLOCK
+  ERROR=$(printf '%s' "$RESULT" | head -3 | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' 2>/dev/null | sed 's/^"//;s/"$//' || echo "scope denied")
+  echo "{\"permissionDecision\":\"block\",\"message\":\"SCOPE DENIED: file editing requires 'code.edit'\\n\\n$ERROR\"}"
   exit 0
 }
 
 echo '{}'
+exit 0

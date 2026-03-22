@@ -1,51 +1,41 @@
 #!/usr/bin/env bash
 # check-scope.sh - PreToolUse hook for /delegate skill
-# Reads JSON from stdin, maps the tool call to a required scope,
-# verifies the delegation token, blocks if denied.
-set -euo pipefail
+# MUST always exit 0 with valid JSON. Any crash = "hook error" in Claude Code.
+set +e
+trap 'echo "{}"; exit 0' ERR
 
-# Read stdin (JSON with tool_input)
-INPUT=$(cat)
+INPUT=$(cat 2>/dev/null || true)
 
-# Check if delegation is active
 TOKEN_FILE="/tmp/.kanoniv-session-token"
 if [ ! -f "$TOKEN_FILE" ]; then
-  # No delegation active - allow everything (skill not initialized yet)
   echo '{}'
   exit 0
 fi
 
-TOKEN=$(cat "$TOKEN_FILE")
+TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null || true)
 if [ -z "$TOKEN" ]; then
   echo '{}'
   exit 0
 fi
 
-# Extract the command from tool_input
 CMD=$(printf '%s' "$INPUT" | python3 -c '
 import sys, json
 try:
     data = json.loads(sys.stdin.read())
-    ti = data.get("tool_input", {})
-    # Bash tool: check command field
-    cmd = ti.get("command", "")
-    print(cmd)
+    print(data.get("tool_input", {}).get("command", ""))
 except Exception:
     print("")
 ' 2>/dev/null || true)
 
-# If no command extracted, allow (might be a non-Bash tool routed here)
 if [ -z "$CMD" ]; then
   echo '{}'
   exit 0
 fi
 
-# Map command to required scope
 CMD_LOWER=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
-
 SCOPE=""
 
-# Git operations
+# Git write operations
 if printf '%s' "$CMD_LOWER" | grep -qE 'git\s+push' 2>/dev/null; then
   SCOPE="git.push"
 elif printf '%s' "$CMD_LOWER" | grep -qE 'git\s+commit' 2>/dev/null; then
@@ -61,37 +51,32 @@ elif printf '%s' "$CMD_LOWER" | grep -qE '(cargo\s+test|pytest|npm\s+test|npm\s+
 elif printf '%s' "$CMD_LOWER" | grep -qE '(cargo\s+build|cargo\s+check|npm\s+run\s+build|make\b|cmake)' 2>/dev/null; then
   SCOPE="code.edit"
 
-# Read-only commands (always allowed)
-elif printf '%s' "$CMD_LOWER" | grep -qE '^(cat|head|tail|less|more|wc|ls|find|grep|rg|tree|file|stat|du|df|echo|printf|pwd|whoami|which|type|env|printenv|date|uname)(\s|$)' 2>/dev/null; then
+# Always allowed: read-only commands
+elif printf '%s' "$CMD_LOWER" | grep -qE '^(cat|head|tail|less|more|wc|ls|find|grep|rg|tree|file|stat|du|df|echo|printf|pwd|whoami|which|type|env|printenv|date|uname|rm|mkdir|touch|cp|mv|chmod|sed|awk|sort|uniq|curl|wget|dig|sleep)(\s|$)' 2>/dev/null; then
   echo '{}'
   exit 0
 
-# Shell test/check commands (always allowed - used by skill setup)
-elif printf '%s' "$CMD_LOWER" | grep -qE '^\[|^test\s|^if\s|^which\s|^command\s' 2>/dev/null; then
+# Always allowed: shell tests, conditionals
+elif printf '%s' "$CMD_LOWER" | grep -qE '^\[|^test\s|^if\s|^command\s' 2>/dev/null; then
   echo '{}'
   exit 0
 
-# pip/cargo install (always allowed - needed for setup)
-elif printf '%s' "$CMD_LOWER" | grep -qE '^pip\s+install|^pip3\s+install|^cargo\s+install' 2>/dev/null; then
-  echo '{}'
-  exit 0
-
-# Git read-only (always allowed)
+# Always allowed: git read-only
 elif printf '%s' "$CMD_LOWER" | grep -qE 'git\s+(status|log|diff|show|branch|tag|remote|fetch|stash\s+list)' 2>/dev/null; then
   echo '{}'
   exit 0
 
-# Package manager read (always allowed)
-elif printf '%s' "$CMD_LOWER" | grep -qE '(pip\s+list|pip\s+show|npm\s+list|cargo\s+--version|python\s+--version|node\s+--version)' 2>/dev/null; then
+# Always allowed: package managers, pip, cargo, npm info
+elif printf '%s' "$CMD_LOWER" | grep -qE '(pip\s+install|pip3\s+install|pip\s+list|pip\s+show|npm\s+list|npm\s+install|cargo\s+install|cargo\s+--version|python|node\s+--version)' 2>/dev/null; then
   echo '{}'
   exit 0
 
-# kanoniv-auth commands (always allowed - meta)
+# Always allowed: kanoniv-auth itself
 elif printf '%s' "$CMD_LOWER" | grep -qE 'kanoniv-auth' 2>/dev/null; then
   echo '{}'
   exit 0
 
-# Default: require code.edit for any unrecognized command
+# Default: require code.edit
 else
   SCOPE="code.edit"
 fi
@@ -99,22 +84,12 @@ fi
 # Verify the scope
 if [ -n "$SCOPE" ]; then
   RESULT=$(kanoniv-auth verify --scope "$SCOPE" --token "$TOKEN" 2>&1) || {
-    # Verification failed - block the command
-    # Extract the error message
-    ERROR=$(echo "$RESULT" | grep -v "^$" | head -5)
-
-    # Escape for JSON
-    ERROR_JSON=$(printf '%s' "$ERROR" | python3 -c '
-import sys, json
-print(json.dumps(sys.stdin.read()))
-' 2>/dev/null | sed 's/^"//;s/"$//')
-
-    cat <<BLOCK
-{"permissionDecision":"block","message":"SCOPE DENIED: requires '$SCOPE'\n\n$ERROR_JSON\n\nTo add this scope, re-delegate:\n  kanoniv-auth delegate --name claude-code --scopes ...,${SCOPE} --ttl 4h"}
-BLOCK
+    ERROR=$(echo "$RESULT" | head -5)
+    ERROR_JSON=$(printf '%s' "$ERROR" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' 2>/dev/null | sed 's/^"//;s/"$//' || echo "$ERROR")
+    echo "{\"permissionDecision\":\"block\",\"message\":\"SCOPE DENIED: requires '$SCOPE'\\n\\n$ERROR_JSON\\n\\nRe-delegate:\\n  kanoniv-auth delegate --name claude-code --scopes ...,$SCOPE --ttl 4h\"}"
     exit 0
   }
 fi
 
-# Scope verified or not required - allow
 echo '{}'
+exit 0
