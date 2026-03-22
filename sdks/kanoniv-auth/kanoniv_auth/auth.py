@@ -207,6 +207,17 @@ def delegate(
     # Save token locally
     _save_token(token_data)
 
+    # Audit log
+    from kanoniv_auth.audit import log_event
+    scopes_str = ",".join(sorted(scopes))
+    ttl_str = f"ttl={ttl}" if ttl else "no-expiry"
+    log_event(
+        action="delegate",
+        detail=f"scopes=[{scopes_str}] {ttl_str}",
+        agent_name=name,
+        agent_did=agent_did,
+    )
+
     return _encode_token(token_data)
 
 
@@ -312,6 +323,20 @@ def verify(
 
     ttl_remaining = (expires_at - now) if expires_at else None
 
+    # Audit log
+    from kanoniv_auth.audit import log_event
+    agent_name = data.get("agent_name")
+    if not agent_name:
+        from kanoniv_auth.registry import resolve_name
+        agent_name = resolve_name(data.get("agent_did", ""))
+    log_event(
+        action="verify",
+        detail=f"scope={action}",
+        result="PASS",
+        agent_name=agent_name,
+        agent_did=data.get("agent_did"),
+    )
+
     return {
         "valid": True,
         "agent_did": data.get("agent_did"),
@@ -349,6 +374,20 @@ def sign(
     payload = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
     envelope["signature"] = agent_keys.sign(payload)
     envelope["delegation_chain"] = data.get("chain", [])
+
+    # Audit log
+    from kanoniv_auth.audit import log_event
+    agent_name = data.get("agent_name")
+    if not agent_name:
+        from kanoniv_auth.registry import resolve_name
+        agent_name = resolve_name(data.get("agent_did", ""))
+    target_str = f"target={target}" if target else ""
+    log_event(
+        action="sign",
+        detail=f"action={action} {target_str} result={result}".strip(),
+        agent_name=agent_name,
+        agent_did=data.get("agent_did"),
+    )
 
     return _encode_token(envelope)
 

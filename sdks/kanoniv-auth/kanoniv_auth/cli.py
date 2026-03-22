@@ -24,17 +24,29 @@ from kanoniv_auth.auth import _decode_token
 import kanoniv_auth.auth as auth_module
 
 
-def _get_token(token: str | None) -> str:
-    """Get token from arg, env, or local storage."""
+def _get_token(token: str | None, agent: str | None = None) -> str:
+    """Get token from arg, agent name, env, or local storage."""
     if token:
         return token
+    if agent:
+        # Load most recent token for this agent from token dir
+        from pathlib import Path
+        token_dir = Path(auth_module.DEFAULT_TOKEN_DIR).expanduser()
+        from kanoniv_auth.registry import get_agent_did
+        agent_did = get_agent_did(agent)
+        if agent_did and token_dir.exists():
+            did_short = agent_did.split(":")[-1][:12]
+            for f in sorted(token_dir.glob(f"*{did_short}*.token"), reverse=True):
+                return f.read_text().strip()
+        click.echo(f"Error: No token found for agent '{agent}'.", err=True)
+        sys.exit(1)
     env = os.environ.get("KANONIV_TOKEN")
     if env:
         return env
     try:
         return load_token()
     except AuthError:
-        click.echo("Error: No token. Pass --token, set KANONIV_TOKEN, or run delegate first.", err=True)
+        click.echo("Error: No token. Pass --token, --agent, set KANONIV_TOKEN, or delegate first.", err=True)
         sys.exit(1)
 
 
@@ -80,8 +92,9 @@ def init(output: str | None, force: bool):
 @click.option("--name", "-n", default=None, help="Agent name (persistent identity across sessions)")
 @click.option("--key", "-k", default=None, help="Root key file path")
 @click.option("--parent", default=None, help="Parent token for sub-delegation")
+@click.option("--export", is_flag=True, help="Output as shell export (eval-able)")
 @click.option("--dry-run", is_flag=True, help="Show what would happen without signing")
-def delegate_cmd(scopes: str, ttl: str | None, name: str | None, key: str | None, parent: str | None, dry_run: bool):
+def delegate_cmd(scopes: str, ttl: str | None, name: str | None, key: str | None, parent: str | None, export: bool, dry_run: bool):
     """Issue a delegation token."""
     scope_list = [s.strip() for s in scopes.split(",") if s.strip()]
     if not scope_list:
@@ -111,7 +124,10 @@ def delegate_cmd(scopes: str, ttl: str | None, name: str | None, key: str | None
                     sys.exit(1)
 
         token = delegate(scopes=scope_list, ttl=ttl, name=name, parent_token=parent)
-        click.echo(token)
+        if export:
+            click.echo(f"export KANONIV_TOKEN={token}")
+        else:
+            click.echo(token)
     except AuthError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -120,9 +136,10 @@ def delegate_cmd(scopes: str, ttl: str | None, name: str | None, key: str | None
 @cli.command("verify")
 @click.option("--scope", "-s", required=True, help="Scope to verify")
 @click.option("--token", "-t", default=None, help="Delegation token (or $KANONIV_TOKEN or latest)")
-def verify_cmd(scope: str, token: str | None):
+@click.option("--agent", "-a", default=None, help="Load token by agent name")
+def verify_cmd(scope: str, token: str | None, agent: str | None):
     """Verify a delegation token against an action."""
-    token = _get_token(token)
+    token = _get_token(token, agent=agent)
     try:
         result = verify(action=scope, token=token)
         ttl_str = f"{_format_duration(result['ttl_remaining'])} remaining" if result["ttl_remaining"] else "no expiry"
@@ -141,11 +158,12 @@ def verify_cmd(scope: str, token: str | None):
 @cli.command("sign")
 @click.option("--action", "-a", required=True, help="Action performed")
 @click.option("--token", "-t", default=None, help="Delegation token")
+@click.option("--agent", default=None, help="Load token by agent name")
 @click.option("--target", default="", help="Target of the action")
 @click.option("--result", "result_", default="success", help="Result (success/failure/partial)")
-def sign_cmd(action: str, token: str | None, target: str, result_: str):
+def sign_cmd(action: str, token: str | None, agent: str | None, target: str, result_: str):
     """Sign an execution envelope."""
-    token = _get_token(token)
+    token = _get_token(token, agent=agent)
     try:
         envelope = sign(action=action, token=token, target=target, result=result_)
         click.echo(envelope)
@@ -156,9 +174,10 @@ def sign_cmd(action: str, token: str | None, target: str, result_: str):
 
 @cli.command("whoami")
 @click.option("--token", "-t", default=None, help="Delegation token")
-def whoami_cmd(token: str | None):
+@click.option("--agent", "-a", default=None, help="Load token by agent name")
+def whoami_cmd(token: str | None, agent: str | None):
     """Show the identity behind a token."""
-    token = _get_token(token)
+    token = _get_token(token, agent=agent)
     try:
         data = _decode_token(token)
         chain = data.get("chain", [])
@@ -317,6 +336,155 @@ def revoke_cmd(token: str | None, service: str | None, delegation_id: str | None
         else:
             click.echo("Specify --token or --service + --delegation-id", err=True)
             sys.exit(1)
+
+
+@cli.command("exec")
+@click.option("--scope", "-s", required=True, help="Required scope for this command")
+@click.option("--token", "-t", default=None, help="Delegation token")
+@click.option("--agent", "-a", default=None, help="Load token by agent name")
+@click.argument("command", nargs=-1, required=True)
+def exec_cmd(scope: str, token: str | None, agent: str | None, command: tuple[str, ...]):
+    """Verify scope, run a command, sign the result. The 'sudo' experience.
+
+    Usage: kanoniv-auth exec --scope deploy.staging -- ./deploy.sh staging
+    """
+    import subprocess
+
+    token_str = _get_token(token, agent=agent)
+
+    # Step 1: Verify
+    try:
+        result = verify(action=scope, token=token_str)
+    except (ScopeViolation, TokenExpired, AuthError) as e:
+        click.secho("DENIED", fg="red", bold=True)
+        click.echo(f"  {e}", err=True)
+        sys.exit(1)
+
+    agent_name = None
+    try:
+        data = _decode_token(token_str)
+        agent_name = data.get("agent_name")
+    except Exception:
+        pass
+
+    name_display = f" ({agent_name})" if agent_name else ""
+    click.secho(f"AUTHORIZED{name_display}", fg="green", bold=True)
+    click.echo(f"  Scope: {scope}")
+    click.echo(f"  Agent: {result['agent_did'][:30]}...")
+    click.echo()
+
+    # Step 2: Execute
+    cmd_str = " ".join(command)
+    click.echo(f"  $ {cmd_str}")
+    click.echo()
+
+    proc = subprocess.run(list(command), capture_output=False)
+    exit_code = proc.returncode
+    exec_result = "success" if exit_code == 0 else f"failure(exit={exit_code})"
+
+    click.echo()
+
+    # Step 3: Sign
+    try:
+        envelope = sign(action=scope, token=token_str, target=cmd_str, result=exec_result)
+        click.secho(f"SIGNED (result={exec_result})", fg="green" if exit_code == 0 else "red", bold=True)
+
+        # Log the exec event
+        from kanoniv_auth.audit import log_event
+        log_event(
+            action="exec",
+            detail=f"scope={scope} cmd={cmd_str[:30]} exit={exit_code}",
+            result=exec_result,
+            agent_name=agent_name,
+            agent_did=result.get("agent_did"),
+        )
+    except AuthError as e:
+        click.echo(f"  Warning: could not sign envelope: {e}", err=True)
+
+    sys.exit(exit_code)
+
+
+@cli.command("status")
+@click.option("--token", "-t", default=None, help="Delegation token")
+@click.option("--agent", "-a", default=None, help="Load token by agent name")
+def status_cmd(token: str | None, agent: str | None):
+    """Quick check: is the current token valid and what can it do?"""
+    try:
+        token_str = _get_token(token, agent=agent)
+    except SystemExit:
+        click.secho("NO TOKEN", fg="red", bold=True)
+        click.echo("  No active token. Delegate one:")
+        click.echo("    kanoniv-auth delegate --name <agent> --scopes <scopes> --ttl 4h")
+        return
+
+    try:
+        data = _decode_token(token_str)
+        scopes = data.get("scopes", [])
+        agent_did = data.get("agent_did", "?")
+        agent_name = data.get("agent_name")
+        if not agent_name:
+            from kanoniv_auth.registry import resolve_name
+            agent_name = resolve_name(agent_did)
+
+        expires = data.get("expires_at")
+        if expires:
+            remaining = expires - time.time()
+            if remaining <= 0:
+                click.secho("EXPIRED", fg="red", bold=True)
+                if agent_name:
+                    click.echo(f"  Agent:  {agent_name}")
+                click.echo(f"  DID:    {agent_did[:30]}...")
+                click.echo(f"  Died:   {_format_duration(-remaining)} ago")
+                click.echo()
+                click.echo("  Re-delegate:")
+                name_flag = f" --name {agent_name}" if agent_name else ""
+                click.echo(f"    kanoniv-auth delegate{name_flag} --scopes {','.join(scopes)} --ttl 4h")
+                return
+            ttl_str = _format_duration(remaining)
+        else:
+            ttl_str = "no expiry"
+
+        click.secho("ACTIVE", fg="green", bold=True)
+        if agent_name:
+            click.secho(f"  Agent:  {agent_name}", fg="cyan", bold=True)
+        click.echo(f"  DID:    {agent_did[:30]}...")
+        click.echo(f"  Scopes: {', '.join(scopes)}")
+        click.secho(f"  TTL:    {ttl_str}", fg="green")
+    except AuthError as e:
+        click.secho("INVALID", fg="red", bold=True)
+        click.echo(f"  {e}", err=True)
+
+
+@cli.command("audit-log")
+@click.option("--agent", "-a", default=None, help="Filter by agent name")
+@click.option("--action", default=None, help="Filter by action (delegate, verify, sign, exec)")
+@click.option("--since", default=None, help="Show entries since (ISO date, e.g. 2026-03-22)")
+@click.option("--limit", "-n", default=50, help="Max entries to show")
+def audit_log_cmd(agent: str | None, action: str | None, since: str | None, limit: int):
+    """View the local audit log."""
+    from kanoniv_auth.audit import read_log
+
+    entries = read_log(agent=agent, action=action, since=since, limit=limit)
+    if not entries:
+        click.echo("No audit log entries." + (" Try without filters." if agent or action or since else ""))
+        return
+
+    click.secho(f"{len(entries)} event(s):", bold=True)
+    click.echo()
+
+    for e in entries:
+        action_colors = {"delegate": "green", "verify": "blue", "sign": "yellow", "exec": "cyan"}
+        color = action_colors.get(e["action"], "white")
+        result_color = "green" if e["result"] in ("ok", "PASS", "success") else "red"
+
+        name = e["agent_name"] if e["agent_name"] != "-" else ""
+        ts = e["timestamp"][11:19] if len(e["timestamp"]) > 11 else e["timestamp"]
+
+        action_str = click.style(e["action"].ljust(12), fg=color)
+        agent_str = click.style((name or e["agent_did"][:16]).ljust(18), fg="cyan")
+        detail_str = e["detail"][:40].ljust(40)
+        result_str = click.style(e["result"], fg=result_color)
+        click.echo(f"  {ts}  {action_str}  {agent_str}  {detail_str}  {result_str}")
 
 
 @cli.group("agents")
