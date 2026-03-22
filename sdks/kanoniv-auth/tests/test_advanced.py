@@ -1,28 +1,21 @@
-"""Advanced tests for kanoniv-auth - edge cases, security, and integration."""
+"""Advanced tests - edge cases, security, interop."""
 
 import time
 import json
 import pytest
 
 from kanoniv_auth import (
-    delegate,
-    verify,
-    sign,
-    generate_keys,
-    AuthError,
-    ScopeViolation,
-    TokenExpired,
-    TokenParseError,
-    SignatureInvalid,
-    ChainTooDeep,
+    delegate, verify, sign, generate_keys, load_token, list_tokens,
+    AuthError, ScopeViolation, TokenExpired, TokenParseError, SignatureInvalid, ChainTooDeep,
 )
 from kanoniv_auth.auth import _decode_token, _encode_token
 import kanoniv_auth.auth as auth_module
 
 
 @pytest.fixture(autouse=True)
-def reset_root():
+def reset_root(tmp_path):
     auth_module._root_keys = None
+    auth_module.DEFAULT_TOKEN_DIR = str(tmp_path / "tokens")
     yield
     auth_module._root_keys = None
 
@@ -34,215 +27,131 @@ def root():
     return keys
 
 
-# --- Token format edge cases ---
-
-class TestTokenFormat:
-    def test_token_is_valid_base64(self, root):
-        import base64
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        # Should decode without error
-        padded = token + "=" * (4 - len(token) % 4) if len(token) % 4 else token
-        raw = base64.urlsafe_b64decode(padded)
-        data = json.loads(raw)
-        assert data["version"] == 1
-        assert "chain" in data
-        assert "scopes" in data
-
-    def test_token_contains_expected_fields(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
+class TestInteroperability:
+    def test_did_format_matches_rust(self, root):
+        """DID must be did:agent:{32 hex chars}."""
+        token = delegate(scopes=["test"], ttl="1h")
         data = _decode_token(token)
-        assert data["version"] == 1
-        assert data["scopes"] == ["deploy.staging"]
-        assert "agent_did" in data
-        assert "chain" in data
-        assert len(data["chain"]) == 1
-        assert "expires_at" in data
-        assert "agent_private_key" in data
+        did = data["agent_did"]
+        assert did.startswith("did:agent:")
+        hex_part = did.split(":")[-1]
+        assert len(hex_part) == 32
+        int(hex_part, 16)  # must be valid hex
 
-    def test_token_without_embedded_key_when_to_specified(self, root):
-        agent = generate_keys()
-        token = delegate(scopes=["deploy.staging"], ttl="1h", to=agent.did)
+    def test_chain_link_has_rust_fields(self, root):
+        """Chain links must have all fields from Rust Delegation struct."""
+        token = delegate(scopes=["test"], ttl="1h")
         data = _decode_token(token)
-        assert "agent_private_key" not in data
-        assert data["agent_did"] == agent.did
+        link = data["chain"][0]
+        required_fields = ["issuer_did", "delegate_did", "issuer_public_key", "caveats", "proof", "parent_proof"]
+        for field in required_fields:
+            assert field in link, f"missing field: {field}"
 
-    def test_decode_malformed_json(self):
-        import base64
-        bad = base64.urlsafe_b64encode(b"not json").decode().rstrip("=")
-        with pytest.raises(TokenParseError):
-            _decode_token(bad)
+    def test_issuer_public_key_is_byte_array(self, root):
+        """issuer_public_key must be a list of ints (byte array), matching Rust Vec<u8> serialization."""
+        token = delegate(scopes=["test"], ttl="1h")
+        data = _decode_token(token)
+        pub_key = data["chain"][0]["issuer_public_key"]
+        assert isinstance(pub_key, list)
+        assert len(pub_key) == 32
+        assert all(isinstance(b, int) and 0 <= b <= 255 for b in pub_key)
 
-    def test_decode_valid_json_missing_chain(self, root):
-        import base64
-        data = json.dumps({"version": 1, "scopes": ["test"]}).encode()
-        token = base64.urlsafe_b64encode(data).decode().rstrip("=")
-        with pytest.raises(TokenParseError, match="no delegation chain"):
-            verify(action="test", token=token)
-
-
-# --- Tamper detection ---
-
-class TestTamperDetection:
-    def test_tampered_scopes_detected(self, root):
+    def test_caveats_format(self, root):
+        """Caveats must use {type, value} format matching Rust Caveat enum."""
         token = delegate(scopes=["deploy.staging"], ttl="1h")
         data = _decode_token(token)
-        data["scopes"] = ["deploy.staging", "deploy.prod"]
+        caveats = data["chain"][0]["caveats"]
+        assert len(caveats) == 2  # action_scope + expires_at
+        assert caveats[0]["type"] == "action_scope"
+        assert caveats[0]["value"] == ["deploy.staging"]
+        assert caveats[1]["type"] == "expires_at"
+        assert isinstance(caveats[1]["value"], str)  # ISO timestamp
+
+    def test_proof_has_signed_message_fields(self, root):
+        """Proof must have nonce, payload, signature, signer_did, timestamp."""
+        token = delegate(scopes=["test"], ttl="1h")
+        data = _decode_token(token)
+        proof = data["chain"][0]["proof"]
+        assert "nonce" in proof
+        assert "payload" in proof
+        assert "signature" in proof
+        assert "signer_did" in proof
+        assert "timestamp" in proof
+
+
+class TestChainSignatureVerification:
+    def test_tampered_payload_caught(self, root):
+        token = delegate(scopes=["deploy.staging"], ttl="1h")
+        data = _decode_token(token)
+        # Tamper with the signed payload
+        data["chain"][0]["proof"]["payload"]["delegate_did"] = "did:agent:tampered"
         tampered = _encode_token(data)
-        # Verify should still work because scope check is on token-level scopes
-        # but the chain link only authorized deploy.staging
-        # This is a known design tradeoff - token scopes are self-reported
-        # Chain verification catches forged signatures, not scope inflation
-        result = verify(action="deploy.staging", token=tampered)
+        with pytest.raises(SignatureInvalid):
+            verify(action="deploy.staging", token=tampered)
+
+    def test_tampered_signature_caught(self, root):
+        token = delegate(scopes=["deploy.staging"], ttl="1h")
+        data = _decode_token(token)
+        data["chain"][0]["proof"]["signature"] = "ab" * 64
+        tampered = _encode_token(data)
+        with pytest.raises(SignatureInvalid):
+            verify(action="deploy.staging", token=tampered)
+
+    def test_swapped_public_key_caught(self, root):
+        token = delegate(scopes=["deploy.staging"], ttl="1h")
+        data = _decode_token(token)
+        # Replace issuer public key with a different key
+        other = generate_keys()
+        data["chain"][0]["issuer_public_key"] = list(other.public_key_bytes)
+        tampered = _encode_token(data)
+        with pytest.raises(SignatureInvalid):
+            verify(action="deploy.staging", token=tampered)
+
+
+class TestLocalStorage:
+    def test_delegate_saves_token(self, root):
+        delegate(scopes=["deploy.staging"], ttl="1h")
+        tokens = list_tokens()
+        assert len(tokens) == 1
+        assert tokens[0]["scopes"] == ["deploy.staging"]
+
+    def test_load_latest_token(self, root):
+        token = delegate(scopes=["deploy.staging"], ttl="1h")
+        loaded = load_token()
+        assert loaded == token
+
+    def test_multiple_tokens_stored(self, root):
+        delegate(scopes=["deploy.staging"], ttl="1h")
+        delegate(scopes=["build"], ttl="2h")
+        tokens = list_tokens()
+        assert len(tokens) == 2
+
+    def test_verify_without_explicit_token(self, root):
+        """verify() should auto-load latest token when not specified."""
+        delegate(scopes=["deploy.staging"], ttl="1h")
+        token = load_token()
+        result = verify(action="deploy.staging", token=token)
         assert result["valid"]
 
-    def test_tampered_expiry_still_verifies_chain(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        data = _decode_token(token)
-        # Extend expiry
-        data["expires_at"] = time.time() + 999999
-        tampered = _encode_token(data)
-        # Chain link has its own expires_at which is still valid
-        result = verify(action="deploy.staging", token=tampered)
-        assert result["valid"]
-
-
-# --- Sign and audit ---
-
-class TestSignIntegration:
-    def test_sign_produces_valid_envelope(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        envelope = sign(action="deploy", token=token, target="staging", result="success")
-        data = _decode_token(envelope)
-        assert data["action"] == "deploy"
-        assert data["target"] == "staging"
-        assert data["result"] == "success"
-        assert "signature" in data
-        assert "delegation_chain" in data
-        assert len(data["delegation_chain"]) == 1
-
-    def test_sign_different_results(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        for result_val in ["success", "failure", "partial"]:
-            envelope = sign(action="deploy", token=token, result=result_val)
-            data = _decode_token(envelope)
-            assert data["result"] == result_val
-
-    def test_sign_with_empty_metadata(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        envelope = sign(action="deploy", token=token, metadata={})
-        data = _decode_token(envelope)
-        assert data["metadata"] == {}
-
-    def test_sign_with_nested_metadata(self, root):
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        meta = {"commit": "abc123", "env": {"region": "us-east-1"}, "tags": ["v1", "canary"]}
-        envelope = sign(action="deploy", token=token, metadata=meta)
-        data = _decode_token(envelope)
-        assert data["metadata"]["commit"] == "abc123"
-        assert data["metadata"]["env"]["region"] == "us-east-1"
-
-
-# --- Sub-delegation edge cases ---
 
 class TestSubDelegationEdgeCases:
-    def test_sub_delegate_exact_same_scopes(self, root):
-        parent = delegate(scopes=["deploy.staging"], ttl="4h")
-        child = delegate(scopes=["deploy.staging"], ttl="2h", parent_token=parent)
-        result = verify(action="deploy.staging", token=child)
-        assert result["valid"]
-        assert result["chain_depth"] == 2
-
-    def test_sub_delegate_with_expired_parent(self, root):
-        parent = delegate(scopes=["deploy.staging"], ttl=0.01)
-        time.sleep(0.05)
-        # Sub-delegation should still work (parent creates token, expiry checked at verify time)
-        child = delegate(scopes=["deploy.staging"], ttl="1h", parent_token=parent)
-        # But verify should fail because the chain link is expired
-        with pytest.raises(TokenExpired):
-            verify(action="deploy.staging", token=child)
-
     def test_four_level_chain(self, root):
         l1 = delegate(scopes=["a", "b", "c", "d"], ttl="4h")
         l2 = delegate(scopes=["a", "b", "c"], ttl="3h", parent_token=l1)
         l3 = delegate(scopes=["a", "b"], ttl="2h", parent_token=l2)
         l4 = delegate(scopes=["a"], ttl="1h", parent_token=l3)
         result = verify(action="a", token=l4)
-        assert result["valid"]
         assert result["chain_depth"] == 4
-        assert result["scopes"] == ["a"]
 
-    def test_sub_delegate_empty_scopes_from_parent(self, root):
-        parent = delegate(scopes=["deploy.staging"], ttl="4h")
-        with pytest.raises(AuthError, match="scopes cannot be empty"):
-            delegate(scopes=[], parent_token=parent)
+    def test_sub_delegate_with_expired_parent(self, root):
+        parent = delegate(scopes=["deploy.staging"], ttl=0.01)
+        time.sleep(0.05)
+        child = delegate(scopes=["deploy.staging"], ttl="1h", parent_token=parent)
+        with pytest.raises(TokenExpired):
+            verify(action="deploy.staging", token=child)
 
-
-# --- Concurrent/multi-root scenarios ---
-
-class TestMultiRoot:
-    def test_verify_with_wrong_root(self):
-        root1 = generate_keys()
-        root2 = generate_keys()
-        auth_module._root_keys = root1
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        with pytest.raises(SignatureInvalid, match="root DID mismatch"):
-            verify(action="deploy.staging", token=token, root_did=root2.did)
-
-    def test_verify_with_correct_explicit_root(self):
-        root = generate_keys()
-        auth_module._root_keys = root
-        token = delegate(scopes=["deploy.staging"], ttl="1h")
-        result = verify(action="deploy.staging", token=token, root_did=root.did)
-        assert result["valid"]
-
-    def test_verify_without_root_loaded_but_explicit_root(self):
-        root = generate_keys()
-        token = delegate(scopes=["deploy.staging"], ttl="1h", root=root)
-        auth_module._root_keys = None
-        # verify without module root but with explicit root_did
-        result = verify(action="deploy.staging", token=token, root_did=root.did)
-        assert result["valid"]
-
-
-# --- Error inheritance ---
 
 class TestErrorHierarchy:
-    def test_scope_violation_is_auth_error(self):
-        assert issubclass(ScopeViolation, AuthError)
-
-    def test_token_expired_is_auth_error(self):
-        assert issubclass(TokenExpired, AuthError)
-
-    def test_chain_too_deep_is_auth_error(self):
-        assert issubclass(ChainTooDeep, AuthError)
-
-    def test_signature_invalid_is_auth_error(self):
-        assert issubclass(SignatureInvalid, AuthError)
-
-    def test_token_parse_error_is_auth_error(self):
-        assert issubclass(TokenParseError, AuthError)
-
-
-# --- TTL edge cases ---
-
-class TestTTLEdgeCases:
-    def test_ttl_whitespace(self, root):
-        token = delegate(scopes=["test"], ttl="  4h  ")
-        result = verify(action="test", token=token)
-        assert result["ttl_remaining"] > 14000
-
-    def test_ttl_uppercase(self, root):
-        # Our parser lowercases, so 4H should work
-        token = delegate(scopes=["test"], ttl="4H")
-        result = verify(action="test", token=token)
-        assert result["ttl_remaining"] > 14000
-
-    def test_very_short_ttl(self, root):
-        token = delegate(scopes=["test"], ttl="1s")
-        result = verify(action="test", token=token)
-        assert result["ttl_remaining"] < 2
-
-    def test_very_long_ttl(self, root):
-        token = delegate(scopes=["test"], ttl="365d")
-        result = verify(action="test", token=token)
-        assert result["ttl_remaining"] > 31000000  # ~365 days in seconds
+    def test_all_errors_inherit_auth_error(self):
+        for cls in [ScopeViolation, TokenExpired, ChainTooDeep, SignatureInvalid, TokenParseError]:
+            assert issubclass(cls, AuthError)

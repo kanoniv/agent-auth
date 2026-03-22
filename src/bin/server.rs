@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
@@ -34,6 +34,7 @@ pub struct AppState {
     db: Arc<Mutex<rusqlite::Connection>>,
     root_keypair: Arc<AgentKeyPair>,
     root_did: String,
+    api_key: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -81,6 +82,31 @@ impl<T: Serialize> ApiResponse<T> {
             data: Some(data),
             error: None,
         })
+    }
+}
+
+fn check_auth(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Option<(StatusCode, Json<ApiResponse<()>>)> {
+    if let Some(ref expected) = state.api_key {
+        let provided = headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "));
+        match provided {
+            Some(key) if key == expected => None,
+            _ => Some((
+                StatusCode::UNAUTHORIZED,
+                Json(ApiResponse {
+                    ok: false,
+                    data: None,
+                    error: Some("Unauthorized. Set Authorization: Bearer <api-key>".to_string()),
+                }),
+            )),
+        }
+    } else {
+        None // No API key configured, allow all
     }
 }
 
@@ -163,8 +189,12 @@ fn log_audit(
 
 async fn handle_delegate(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<DelegateRequest>,
 ) -> impl IntoResponse {
+    if let Some(err) = check_auth(&state, &headers) {
+        return err.into_response();
+    }
     if req.scopes.is_empty() {
         return error_response("scopes cannot be empty").into_response();
     }
@@ -379,8 +409,12 @@ async fn handle_verify(
 
 async fn handle_revoke(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<RevokeRequest>,
 ) -> impl IntoResponse {
+    if let Some(err) = check_auth(&state, &headers) {
+        return err.into_response();
+    }
     let db = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
     // Get agent_did before revoking (for audit)
@@ -702,7 +736,12 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
 
 // --- Server startup ---
 
-pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result<(), String> {
+pub async fn run_server(
+    port: u16,
+    db_path: &str,
+    root_key_path: &str,
+    api_key: Option<String>,
+) -> Result<(), String> {
     let data: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(root_key_path)
             .map_err(|e| format!("Failed to read root key: {e}"))?,
@@ -725,10 +764,17 @@ pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result
         .map_err(|e| format!("Failed to set pragmas: {e}"))?;
     init_db(&conn).map_err(|e| format!("Failed to init database: {e}"))?;
 
+    let auth_status = if api_key.is_some() {
+        "enabled"
+    } else {
+        "disabled (use --api-key to secure)"
+    };
+
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
         root_keypair: Arc::new(keypair),
         root_did: root_did.clone(),
+        api_key,
     };
 
     let app = Router::new()
@@ -749,6 +795,7 @@ pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result
     eprintln!("  Dashboard: http://localhost:{port}/dashboard");
     eprintln!("  Root DID:  {root_did}");
     eprintln!("  Database:  {db_path}");
+    eprintln!("  Auth:      {auth_status}");
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await

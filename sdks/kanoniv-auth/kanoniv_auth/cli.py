@@ -1,12 +1,4 @@
-"""kanoniv-auth CLI - Sudo for AI agents.
-
-Usage:
-    kanoniv-auth init [--output PATH]
-    kanoniv-auth delegate --scopes X --ttl 4h
-    kanoniv-auth verify --scope X [--token TOKEN]
-    kanoniv-auth sign --action X [--token TOKEN]
-    kanoniv-auth whoami [--token TOKEN]
-"""
+"""kanoniv-auth CLI - Sudo for AI agents."""
 
 from __future__ import annotations
 
@@ -22,21 +14,28 @@ from kanoniv_auth import (
     sign,
     init_root,
     load_root,
+    load_token,
+    list_tokens,
     AuthError,
     ScopeViolation,
     TokenExpired,
 )
-from kanoniv_auth.auth import _decode_token, _parse_ttl
+from kanoniv_auth.auth import _decode_token
 import kanoniv_auth.auth as auth_module
 
 
 def _get_token(token: str | None) -> str:
-    """Get token from arg, env, or fail."""
-    t = token or os.environ.get("KANONIV_TOKEN")
-    if not t:
-        click.echo("Error: No token. Pass --token or set KANONIV_TOKEN.", err=True)
+    """Get token from arg, env, or local storage."""
+    if token:
+        return token
+    env = os.environ.get("KANONIV_TOKEN")
+    if env:
+        return env
+    try:
+        return load_token()
+    except AuthError:
+        click.echo("Error: No token. Pass --token, set KANONIV_TOKEN, or run delegate first.", err=True)
         sys.exit(1)
-    return t
 
 
 def _format_duration(secs: float) -> str:
@@ -97,7 +96,6 @@ def delegate_cmd(scopes: str, ttl: str | None, key: str | None, parent: str | No
 
     try:
         if not parent:
-            # Load root key
             if key:
                 load_root(key)
             else:
@@ -118,21 +116,17 @@ def delegate_cmd(scopes: str, ttl: str | None, key: str | None, parent: str | No
 
 @cli.command("verify")
 @click.option("--scope", "-s", required=True, help="Scope to verify")
-@click.option("--token", "-t", default=None, help="Delegation token (or $KANONIV_TOKEN)")
+@click.option("--token", "-t", default=None, help="Delegation token (or $KANONIV_TOKEN or latest)")
 def verify_cmd(scope: str, token: str | None):
     """Verify a delegation token against an action."""
     token = _get_token(token)
     try:
         result = verify(action=scope, token=token)
-        data = _decode_token(token)
-        chain = data.get("chain", [])
-        root_did = chain[0].get("issuer_did", "?") if chain else "?"
-
         ttl_str = f"{_format_duration(result['ttl_remaining'])} remaining" if result["ttl_remaining"] else "no expiry"
 
         click.secho("VERIFIED", fg="green", bold=True)
         click.echo(f"  Agent:   {result['agent_did']}")
-        click.echo(f"  Root:    {root_did}")
+        click.echo(f"  Root:    {result['root_did']}")
         click.echo(f"  Scopes:  {result['scopes']}")
         click.echo(f"  Expires: {ttl_str}")
         click.echo(f"  Chain:   {result['chain_depth']} link(s)")
@@ -143,7 +137,7 @@ def verify_cmd(scope: str, token: str | None):
 
 @cli.command("sign")
 @click.option("--action", "-a", required=True, help="Action performed")
-@click.option("--token", "-t", default=None, help="Delegation token (or $KANONIV_TOKEN)")
+@click.option("--token", "-t", default=None, help="Delegation token")
 @click.option("--target", default="", help="Target of the action")
 @click.option("--result", "result_", default="success", help="Result (success/failure/partial)")
 def sign_cmd(action: str, token: str | None, target: str, result_: str):
@@ -158,7 +152,7 @@ def sign_cmd(action: str, token: str | None, target: str, result_: str):
 
 
 @cli.command("whoami")
-@click.option("--token", "-t", default=None, help="Delegation token (or $KANONIV_TOKEN)")
+@click.option("--token", "-t", default=None, help="Delegation token")
 def whoami_cmd(token: str | None):
     """Show the identity behind a token."""
     token = _get_token(token)
@@ -222,7 +216,14 @@ def audit_cmd(data: str):
                     click.echo(f"  {short} (root)")
 
                 d_short = deleg[:30] + "..." if len(deleg) > 30 else deleg
-                click.echo(f"{indent}|-- {d_short}")
+
+                # Extract scopes from caveats
+                scope_str = ""
+                for c in link.get("caveats", []):
+                    if c.get("type") == "action_scope":
+                        scope_str = ", ".join(c.get("value", []))
+
+                click.echo(f"{indent}|-- {d_short}" + (f" [{scope_str}]" if scope_str else ""))
 
             click.echo()
             click.echo(f"  Chain depth: {len(chain)}")
@@ -231,6 +232,80 @@ def audit_cmd(data: str):
     except AuthError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+@cli.command("tokens")
+def tokens_cmd():
+    """List saved delegation tokens."""
+    tokens = list_tokens()
+    if not tokens:
+        click.echo("No saved tokens. Run: kanoniv-auth delegate --scopes <scopes> --ttl <ttl>")
+        return
+
+    click.secho(f"{len(tokens)} saved token(s):", bold=True)
+    click.echo()
+    for t in tokens:
+        status = click.style("expired", fg="red") if t["expired"] else click.style("active", fg="green")
+        scopes = ", ".join(t["scopes"])
+        ttl = ""
+        if t["expires_at"]:
+            remaining = t["expires_at"] - time.time()
+            ttl = _format_duration(abs(remaining)) + (" remaining" if remaining > 0 else " ago")
+        else:
+            ttl = "no expiry"
+        click.echo(f"  {t['file']}")
+        click.echo(f"    Agent:  {t['agent_did']}")
+        click.echo(f"    Scopes: [{scopes}]")
+        click.echo(f"    TTL:    {ttl}  [{status}]")
+        click.echo()
+
+
+@cli.command("revoke")
+@click.option("--token", "-t", default=None, help="Token to revoke")
+@click.option("--service", default=None, help="Delegation service URL (e.g. http://localhost:7400)")
+@click.option("--delegation-id", default=None, help="Delegation ID to revoke on service")
+def revoke_cmd(token: str | None, service: str | None, delegation_id: str | None):
+    """Revoke a delegation token."""
+    import json
+    from pathlib import Path
+
+    if service and delegation_id:
+        # Revoke via service API
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{service.rstrip('/')}/revoke",
+                data=json.dumps({"delegation_id": delegation_id}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            resp = urllib.request.urlopen(req)
+            result = json.loads(resp.read())
+            if result.get("ok"):
+                click.secho(f"Revoked delegation {delegation_id}", fg="green")
+            else:
+                click.echo(f"Error: {result.get('error', 'unknown')}", err=True)
+                sys.exit(1)
+        except Exception as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+    else:
+        # Local revoke: delete token file
+        token_dir = Path("~/.kanoniv/tokens").expanduser()
+        if token:
+            # Find and delete the token file matching this token
+            deleted = False
+            for f in token_dir.glob("*.token"):
+                if f.read_text().strip() == token.strip():
+                    f.unlink()
+                    click.secho(f"Deleted local token: {f.name}", fg="green")
+                    deleted = True
+            if not deleted:
+                click.echo("Token not found in local storage.", err=True)
+                sys.exit(1)
+        else:
+            click.echo("Specify --token or --service + --delegation-id", err=True)
+            sys.exit(1)
 
 
 def main():

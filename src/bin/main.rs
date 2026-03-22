@@ -126,6 +126,9 @@ enum Commands {
         /// Root key file path
         #[arg(short, long)]
         key: Option<PathBuf>,
+        /// API key for authentication (or set KANONIV_API_KEY env)
+        #[arg(long, env = "KANONIV_API_KEY")]
+        api_key: Option<String>,
     },
 }
 
@@ -160,13 +163,18 @@ fn main() {
             Err(e) => Err(e),
         },
         #[cfg(feature = "server")]
-        Commands::Serve { port, db, key } => {
+        Commands::Serve {
+            port,
+            db,
+            key,
+            api_key,
+        } => {
             let key_path = key
                 .unwrap_or_else(default_key_path)
                 .to_string_lossy()
                 .to_string();
             match tokio::runtime::Runtime::new() {
-                Ok(rt) => rt.block_on(server::run_server(port, &db, &key_path)),
+                Ok(rt) => rt.block_on(server::run_server(port, &db, &key_path, api_key)),
                 Err(e) => Err(format!("Failed to create runtime: {e}")),
             }
         }

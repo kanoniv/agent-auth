@@ -9,7 +9,7 @@ Replace API keys with cryptographic delegation.
     verify(action="deploy.prod", token=token)       # raises ScopeViolation
 """
 
-from kanoniv_auth.auth import delegate, verify, sign, init_root, load_root
+from kanoniv_auth.auth import delegate, verify, sign, init_root, load_root, load_token, list_tokens
 from kanoniv_auth.errors import (
     AuthError,
     ScopeViolation,
@@ -27,6 +27,8 @@ __all__ = [
     "sign",
     "init_root",
     "load_root",
+    "load_token",
+    "list_tokens",
     "AuthError",
     "ScopeViolation",
     "TokenExpired",

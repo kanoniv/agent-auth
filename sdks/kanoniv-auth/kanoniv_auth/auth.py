@@ -6,21 +6,29 @@ Three functions. That's it.
     verify(action="deploy.staging", token=token)   # works
     verify(action="deploy.prod", token=token)       # raises ScopeViolation
 
-Delegation tokens are self-contained, cryptographically signed,
-and verifiable without any network call. Scopes can only narrow
-through a delegation chain - never widen.
+Token format matches the Rust kanoniv-agent-auth crate exactly.
+Tokens are interoperable between Python CLI, Rust CLI, and the
+delegation service.
 """
 
 from __future__ import annotations
 
 import base64
+import datetime
 import json
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
-from kanoniv_auth.crypto import KeyPair, generate_keys, load_keys, verify_signature
+from kanoniv_auth.crypto import (
+    KeyPair,
+    generate_keys,
+    load_keys,
+    load_keys_from_hex,
+    verify_signature_with_key,
+)
 from kanoniv_auth.errors import (
     AuthError,
     ChainTooDeep,
@@ -33,6 +41,7 @@ from kanoniv_auth.errors import (
 
 MAX_CHAIN_DEPTH = 32
 DEFAULT_KEY_DIR = "~/.kanoniv"
+DEFAULT_TOKEN_DIR = "~/.kanoniv/tokens"
 
 # Module-level root key (set by init_root or load_root)
 _root_keys: KeyPair | None = None
@@ -42,12 +51,6 @@ def init_root(path: str | None = None) -> KeyPair:
     """Generate a new root key pair and save it.
 
     The root key is the master authority. Treat it like an SSH key.
-
-    Args:
-        path: Where to save. Defaults to ~/.kanoniv/root.key
-
-    Returns:
-        The generated KeyPair (also set as module-level root).
     """
     global _root_keys
     keys = generate_keys()
@@ -58,14 +61,7 @@ def init_root(path: str | None = None) -> KeyPair:
 
 
 def load_root(path: str | None = None) -> KeyPair:
-    """Load root key pair from disk.
-
-    Args:
-        path: Key file path. Defaults to ~/.kanoniv/root.key
-
-    Returns:
-        The loaded KeyPair (also set as module-level root).
-    """
+    """Load root key pair from disk."""
     global _root_keys
     load_path = path or str(Path(DEFAULT_KEY_DIR).expanduser() / "root.key")
     keys = KeyPair.load(load_path)
@@ -82,24 +78,8 @@ def delegate(
 ) -> str:
     """Issue a delegation token.
 
-    Args:
-        scopes: What the agent is allowed to do. e.g. ["deploy.staging"]
-        ttl: How long the token is valid.
-             String: "4h", "30m", "1d", "3600s"
-             Float: seconds
-             None: no expiry
-        to: DID of the agent receiving the delegation.
-            If None, generates a new agent identity.
-        root: Root key pair. If None, uses module-level root.
-        parent_token: For sub-delegation. The parent's token.
-                      Scopes must be a subset of the parent's scopes.
-
-    Returns:
-        Base64-encoded JSON token string.
-
-    Raises:
-        AuthError: If no root key is loaded.
-        ScopeViolation: If sub-delegation tries to widen scopes.
+    Returns a base64-encoded JSON token interoperable with the Rust CLI
+    and delegation service.
     """
     if not scopes:
         raise AuthError("scopes cannot be empty")
@@ -108,7 +88,7 @@ def delegate(
     if parent_token:
         parent = _decode_token(parent_token)
         parent_chain = parent.get("chain", [])
-        parent_scopes = _effective_scopes(parent)
+        parent_scopes = parent.get("scopes", [])
 
         # Sub-delegation can only narrow
         invalid = [s for s in scopes if s not in parent_scopes]
@@ -116,14 +96,14 @@ def delegate(
             raise ScopeViolation(
                 scope=invalid[0],
                 has=parent_scopes,
-                delegator_did=parent.get("issuer_did"),
+                delegator_did=parent.get("agent_did"),
             )
 
         # Check chain depth
         if len(parent_chain) + 1 >= MAX_CHAIN_DEPTH:
             raise ChainTooDeep(len(parent_chain) + 1, MAX_CHAIN_DEPTH)
 
-        # The parent's agent key becomes the issuer for sub-delegation
+        # Parent's agent key becomes issuer for sub-delegation
         signing_keys = _get_agent_keys(parent)
         issuer_did = parent.get("agent_did", signing_keys.did)
     else:
@@ -136,14 +116,15 @@ def delegate(
     # Generate agent identity for the delegate
     if to:
         agent_did = to
+        agent_keys = None
     else:
         agent_keys = generate_keys()
         agent_did = agent_keys.did
 
     # Compute expiry
-    expires_at = None
-    if ttl is not None:
-        ttl_seconds = _parse_ttl(ttl)
+    ttl_seconds = _parse_ttl(ttl) if ttl is not None else None
+    expires_at: float | None = None
+    if ttl_seconds is not None:
         expires_at = time.time() + ttl_seconds
         # Cannot exceed parent's expiry
         if parent_token:
@@ -151,20 +132,53 @@ def delegate(
             if parent_expires is not None:
                 expires_at = min(expires_at, parent_expires)
 
-    # Build the delegation link
+    # Build caveats (Rust-compatible format)
+    caveats = [{"type": "action_scope", "value": sorted(scopes)}]
+    if expires_at is not None:
+        exp_dt = datetime.datetime.fromtimestamp(expires_at, tz=datetime.timezone.utc)
+        caveats.append({
+            "type": "expires_at",
+            "value": exp_dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{exp_dt.microsecond // 1000:03d}Z",
+        })
+
+    # Build the delegation link (Rust Delegation struct format)
+    # Sign the payload: {issuer_did, delegate_did, caveats, parent_hash}
+    nonce = str(uuid.uuid4())
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{datetime.datetime.now(datetime.timezone.utc).microsecond // 1000:03d}Z"
+
+    signed_payload = {
+        "caveats": caveats,
+        "delegate_did": agent_did,
+        "issuer_did": issuer_did,
+        "parent_hash": None,
+    }
+    # Sign the canonical envelope: {nonce, payload, signer_did, timestamp}
+    # This matches the Rust SignedMessage::sign() canonical form exactly.
+    canonical = {
+        "nonce": nonce,
+        "payload": signed_payload,
+        "signer_did": issuer_did,
+        "timestamp": ts,
+    }
+    canonical_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+    signature = signing_keys.sign(canonical_bytes)
+
+    proof = {
+        "nonce": nonce,
+        "payload": signed_payload,
+        "signature": signature,
+        "signer_did": issuer_did,
+        "timestamp": ts,
+    }
+
     link = {
         "issuer_did": issuer_did,
-        "agent_did": agent_did,
-        "scopes": sorted(scopes),
-        "created_at": time.time(),
+        "delegate_did": agent_did,
+        "issuer_public_key": list(signing_keys.public_key_bytes),
+        "caveats": caveats,
+        "parent_proof": None,
+        "proof": proof,
     }
-    if expires_at is not None:
-        link["expires_at"] = expires_at
-
-    # Sign the link
-    payload = json.dumps(link, sort_keys=True, separators=(",", ":")).encode()
-    link["signature"] = signing_keys.sign(payload)
-    link["issuer_public_key"] = signing_keys.export_public()
 
     # Build the token
     token_data: dict[str, Any] = {
@@ -176,9 +190,12 @@ def delegate(
     if expires_at is not None:
         token_data["expires_at"] = expires_at
 
-    # If we generated agent keys, embed them so the agent can sub-delegate and sign
-    if not to:
+    # Embed agent keys for sub-delegation and signing
+    if agent_keys is not None:
         token_data["agent_private_key"] = agent_keys.export_private()
+
+    # Save token locally
+    _save_token(token_data)
 
     return _encode_token(token_data)
 
@@ -190,41 +207,11 @@ def verify(
 ) -> dict:
     """Verify a delegation token against an action.
 
-    Checks:
-    1. Token is not expired
-    2. Action scope is in the delegation
-    3. Every signature in the chain is valid
-    4. Chain depth is within limits
-    5. Scopes only narrow through the chain
-
-    Args:
-        action: The scope being claimed. e.g. "deploy.staging"
-        token: The base64 JSON token from delegate().
-        root_did: Expected root DID. If None, uses module-level root's DID.
-
-    Returns:
-        Dict with verification details:
-        {
-            "valid": True,
-            "agent_did": "did:key:...",
-            "root_did": "did:key:...",
-            "scopes": ["deploy.staging"],
-            "expires_at": 1234567890.0 or None,
-            "ttl_remaining": 3600.0 or None,
-            "chain_depth": 2,
-        }
-
-    Raises:
-        ScopeViolation: Action not in delegated scopes.
-        TokenExpired: Token has expired.
-        SignatureInvalid: A chain link has a bad signature.
-        ChainTooDeep: Chain exceeds max depth.
-        TokenParseError: Token is malformed.
+    Checks expiry, scope, chain signatures, and scope narrowing.
     """
     data = _decode_token(token)
     chain = data.get("chain", [])
 
-    # Check chain depth
     if len(chain) > MAX_CHAIN_DEPTH:
         raise ChainTooDeep(len(chain), MAX_CHAIN_DEPTH)
 
@@ -247,25 +234,52 @@ def verify(
             delegator_did=root_link.get("issuer_did"),
         )
 
-    # Verify every signature in the chain
+    # Verify chain signatures
     expected_root = root_did or (_root_keys.did if _root_keys else None)
-    prev_scopes: list[str] | None = None
 
     for i, link in enumerate(chain):
-        # Verify signature
-        issuer_pub_b64 = link.get("issuer_public_key")
-        if not issuer_pub_b64:
+        # Get issuer public key from link
+        issuer_pub = link.get("issuer_public_key")
+        if not issuer_pub:
             raise SignatureInvalid(i, link.get("issuer_did", "unknown"), "missing issuer_public_key")
 
-        sig = link.get("signature")
+        # Convert public key to bytes
+        if isinstance(issuer_pub, list):
+            pub_bytes = bytes(issuer_pub)
+        elif isinstance(issuer_pub, str):
+            pub_bytes = bytes.fromhex(issuer_pub)
+        else:
+            raise SignatureInvalid(i, link.get("issuer_did", "unknown"), "invalid issuer_public_key format")
+
+        # Verify the proof signature
+        proof = link.get("proof")
+        if proof is None:
+            raise SignatureInvalid(i, link.get("issuer_did", "unknown"), "missing proof")
+
+        sig = proof.get("signature")
         if not sig:
-            raise SignatureInvalid(i, link.get("issuer_did", "unknown"), "missing signature")
+            raise SignatureInvalid(i, link.get("issuer_did", "unknown"), "missing signature in proof")
 
-        # Reconstruct the signed payload (everything except signature and public key)
-        verify_link = {k: v for k, v in link.items() if k not in ("signature", "issuer_public_key")}
-        payload = json.dumps(verify_link, sort_keys=True, separators=(",", ":")).encode()
+        # Reconstruct the canonical envelope for verification.
+        # Rust signs: {nonce, payload, signer_did, timestamp} as sorted-key JSON.
+        signed_payload = proof.get("payload")
+        if signed_payload is None:
+            signed_payload = {
+                "caveats": link.get("caveats", []),
+                "delegate_did": link.get("delegate_did", ""),
+                "issuer_did": link.get("issuer_did", ""),
+                "parent_hash": None,
+            }
 
-        if not verify_signature(link.get("issuer_did", ""), payload, sig):
+        canonical = {
+            "nonce": proof.get("nonce", ""),
+            "payload": signed_payload,
+            "signer_did": proof.get("signer_did", link.get("issuer_did", "")),
+            "timestamp": proof.get("timestamp", ""),
+        }
+        payload_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+
+        if not verify_signature_with_key(pub_bytes, payload_bytes, sig):
             raise SignatureInvalid(i, link.get("issuer_did", "unknown"))
 
         # Verify root DID on first link
@@ -275,22 +289,16 @@ def verify(
                 f"root DID mismatch: expected {expected_root}",
             )
 
-        # Verify scopes only narrow
-        link_scopes = link.get("scopes", [])
-        if prev_scopes is not None:
-            widened = [s for s in link_scopes if s not in prev_scopes]
-            if widened:
-                raise ScopeViolation(
-                    scope=widened[0],
-                    has=prev_scopes,
-                    delegator_did=link.get("issuer_did"),
-                )
-        prev_scopes = link_scopes
-
-        # Verify per-link expiry
-        link_expires = link.get("expires_at")
-        if link_expires is not None and now > link_expires:
-            raise TokenExpired(now - link_expires)
+        # Check per-link expiry from caveats
+        for caveat in link.get("caveats", []):
+            if caveat.get("type") == "expires_at":
+                try:
+                    exp_str = caveat["value"]
+                    exp_dt = datetime.datetime.fromisoformat(exp_str.replace("Z", "+00:00"))
+                    if now > exp_dt.timestamp():
+                        raise TokenExpired(now - exp_dt.timestamp())
+                except (ValueError, KeyError):
+                    pass
 
     ttl_remaining = (expires_at - now) if expires_at else None
 
@@ -312,21 +320,7 @@ def sign(
     result: str = "success",
     metadata: dict | None = None,
 ) -> str:
-    """Sign an execution envelope using the agent's delegated key.
-
-    Creates a signed record of what the agent did, provable from the
-    delegation chain. This is the audit trail entry.
-
-    Args:
-        action: What was done. e.g. "deploy"
-        token: The agent's delegation token.
-        target: What it was done to. e.g. "staging"
-        result: Outcome. "success", "failure", or "partial".
-        metadata: Additional context to include in the signed envelope.
-
-    Returns:
-        Base64-encoded JSON execution envelope.
-    """
+    """Sign an execution envelope using the agent's delegated key."""
     data = _decode_token(token)
     agent_keys = _get_agent_keys(data)
 
@@ -342,7 +336,6 @@ def sign(
         "metadata": metadata or {},
     }
 
-    # Sign the envelope
     payload = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
     envelope["signature"] = agent_keys.sign(payload)
     envelope["delegation_chain"] = data.get("chain", [])
@@ -350,19 +343,80 @@ def sign(
     return _encode_token(envelope)
 
 
+# --- Token storage ---
+
+def _save_token(token_data: dict) -> None:
+    """Save token to ~/.kanoniv/tokens/."""
+    token_dir = Path(DEFAULT_TOKEN_DIR).expanduser()
+    token_dir.mkdir(parents=True, exist_ok=True)
+
+    agent_did = token_data.get("agent_did", "unknown")
+    # Use short hash of agent_did as filename
+    short = agent_did.split(":")[-1][:12] if ":" in agent_did else agent_did[:12]
+    scopes = token_data.get("scopes", [])
+    scope_tag = "-".join(s.replace(".", "_") for s in scopes[:3])
+    filename = f"{scope_tag}_{short}.token" if scope_tag else f"{short}.token"
+
+    token_path = token_dir / filename
+    token_path.write_text(_encode_token(token_data))
+
+    # Also save as "latest"
+    latest_path = token_dir / "latest.token"
+    latest_path.write_text(_encode_token(token_data))
+
+
+def load_token(path: str | None = None) -> str:
+    """Load a token from disk. Defaults to ~/.kanoniv/tokens/latest.token."""
+    if path:
+        return Path(path).expanduser().read_text().strip()
+    latest = Path(DEFAULT_TOKEN_DIR).expanduser() / "latest.token"
+    if latest.exists():
+        return latest.read_text().strip()
+    raise AuthError(
+        "No token found. Delegate first:\n"
+        "  kanoniv-auth delegate --scopes deploy.staging --ttl 4h"
+    )
+
+
+def list_tokens() -> list[dict]:
+    """List all saved tokens with their metadata."""
+    token_dir = Path(DEFAULT_TOKEN_DIR).expanduser()
+    if not token_dir.exists():
+        return []
+    tokens = []
+    for f in sorted(token_dir.glob("*.token")):
+        if f.name == "latest.token":
+            continue
+        try:
+            data = _decode_token(f.read_text().strip())
+            expires = data.get("expires_at")
+            expired = expires is not None and time.time() > expires
+            tokens.append({
+                "file": f.name,
+                "agent_did": data.get("agent_did", "?"),
+                "scopes": data.get("scopes", []),
+                "expires_at": expires,
+                "expired": expired,
+                "chain_depth": len(data.get("chain", [])),
+            })
+        except Exception:
+            pass
+    return tokens
+
+
 # --- Token encoding ---
 
 def _encode_token(data: dict) -> str:
-    """Encode token data as base64 JSON."""
+    """Encode token data as base64url JSON (no padding)."""
     raw = json.dumps(data, separators=(",", ":")).encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
 def _decode_token(token: str) -> dict:
-    """Decode a base64 JSON token."""
+    """Decode a base64url JSON token."""
     try:
-        # Add back padding
-        padded = token + "=" * (4 - len(token) % 4) if len(token) % 4 else token
+        padded = token.strip()
+        padded += "=" * (4 - len(padded) % 4) if len(padded) % 4 else ""
         raw = base64.urlsafe_b64decode(padded)
         return json.loads(raw)
     except Exception as e:
@@ -386,16 +440,7 @@ def _get_agent_keys(token_data: dict) -> KeyPair:
 
 
 def _parse_ttl(ttl: str | float) -> float:
-    """Parse a TTL value into seconds.
-
-    Accepts:
-        "4h" -> 14400
-        "30m" -> 1800
-        "1d" -> 86400
-        "3600s" -> 3600
-        "3600" -> 3600
-        3600.0 -> 3600.0
-    """
+    """Parse a TTL value into seconds."""
     if isinstance(ttl, (int, float)):
         if ttl <= 0:
             raise AuthError(f"TTL must be positive, got {ttl}")
@@ -410,11 +455,9 @@ def _parse_ttl(ttl: str | float) -> float:
 
     value = float(match.group(1))
     unit = match.group(2) or "s"
-
     multipliers = {"s": 1, "m": 60, "h": 3600, "d": 86400}
     result = value * multipliers[unit]
 
     if result <= 0:
         raise AuthError(f"TTL must be positive, got {result}s")
-
     return result

@@ -1,11 +1,19 @@
 import { useState, useCallback } from 'react';
-import { ShieldCheck, ShieldX, ChevronRight, Clock } from 'lucide-react';
+import { ShieldCheck, ShieldX, ChevronRight, Clock, Loader2 } from 'lucide-react';
 
 interface ChainLink {
   issuer_did?: string;
   delegate_did?: string;
   agent_did?: string;
+  issuer_public_key?: number[];
   caveats?: Array<{ type: string; value: unknown }>;
+  proof?: {
+    nonce?: string;
+    payload?: Record<string, unknown>;
+    signature?: string;
+    signer_did?: string;
+    timestamp?: string;
+  };
 }
 
 interface VerifyResult {
@@ -18,11 +26,11 @@ interface VerifyResult {
   expires_at?: number;
   ttl_remaining?: number;
   error?: string;
+  signature_verified?: boolean;
 }
 
 function decodeToken(token: string): Record<string, unknown> | null {
   try {
-    // Add padding
     let padded = token.trim();
     while (padded.length % 4 !== 0) padded += '=';
     const json = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
@@ -32,7 +40,66 @@ function decodeToken(token: string): Record<string, unknown> | null {
   }
 }
 
-function verifyToken(token: string): VerifyResult {
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+async function verifyEd25519Signature(
+  publicKeyBytes: Uint8Array,
+  message: Uint8Array,
+  signatureHex: string,
+): Promise<boolean> {
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      publicKeyBytes.buffer as ArrayBuffer,
+      { name: 'Ed25519' },
+      false,
+      ['verify'],
+    );
+    const sig = hexToBytes(signatureHex);
+    return await crypto.subtle.verify('Ed25519', key, sig.buffer as ArrayBuffer, message.buffer as ArrayBuffer);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyChainLink(link: ChainLink): Promise<{ valid: boolean; error?: string }> {
+  const proof = link.proof;
+  if (!proof || !proof.signature || !proof.payload) {
+    return { valid: false, error: 'missing proof' };
+  }
+
+  const pubKeyArray = link.issuer_public_key;
+  if (!pubKeyArray || !Array.isArray(pubKeyArray) || pubKeyArray.length !== 32) {
+    return { valid: false, error: 'missing or invalid issuer_public_key' };
+  }
+
+  // Reconstruct canonical envelope: {nonce, payload, signer_did, timestamp}
+  const canonical = {
+    nonce: proof.nonce || '',
+    payload: proof.payload,
+    signer_did: proof.signer_did || link.issuer_did || '',
+    timestamp: proof.timestamp || '',
+  };
+
+  // Sort keys for deterministic JSON (matching Rust BTreeMap serialization)
+  const sortedJson = JSON.stringify(canonical, Object.keys(canonical).sort());
+  // Use compact separators matching Rust's serde_json
+  const compactJson = JSON.stringify(JSON.parse(sortedJson));
+
+  const message = new TextEncoder().encode(compactJson);
+  const pubKey = new Uint8Array(pubKeyArray);
+
+  const valid = await verifyEd25519Signature(pubKey, message, proof.signature);
+  return { valid, error: valid ? undefined : 'signature verification failed' };
+}
+
+async function verifyToken(token: string): Promise<VerifyResult> {
   const data = decodeToken(token);
   if (!data) return { valid: false, error: 'Invalid token format. Paste a base64-encoded delegation token.' };
 
@@ -56,8 +123,29 @@ function verifyToken(token: string): VerifyResult {
     }
   }
 
+  // Verify each chain link signature
+  let signatureVerified = true;
+  let sigError: string | undefined;
+  for (let i = 0; i < chain.length; i++) {
+    const result = await verifyChainLink(chain[i]);
+    if (!result.valid) {
+      signatureVerified = false;
+      sigError = `Chain link ${i}: ${result.error}`;
+      break;
+    }
+  }
+
   const root_did = chain[0]?.issuer_did;
   const ttl_remaining = expires_at ? expires_at - Date.now() / 1000 : undefined;
+
+  if (!signatureVerified) {
+    return {
+      valid: false,
+      error: sigError,
+      chain, scopes, agent_did, chain_depth: chain.length, expires_at,
+      signature_verified: false,
+    };
+  }
 
   return {
     valid: true,
@@ -68,6 +156,7 @@ function verifyToken(token: string): VerifyResult {
     chain_depth: chain.length,
     expires_at,
     ttl_remaining,
+    signature_verified: true,
   };
 }
 
@@ -86,10 +175,17 @@ const EXAMPLE_HINT = 'Paste a delegation token or execution envelope (base64 JSO
 export const VerifyPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
-  const handleVerify = useCallback(() => {
+  const handleVerify = useCallback(async () => {
     if (!input.trim()) return;
-    setResult(verifyToken(input.trim()));
+    setVerifying(true);
+    try {
+      const r = await verifyToken(input.trim());
+      setResult(r);
+    } finally {
+      setVerifying(false);
+    }
   }, [input]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -102,7 +198,7 @@ export const VerifyPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-white mb-2">Verify Delegation</h1>
         <p className="text-[#8b949e]">
           Paste a delegation token or execution envelope. Verification happens entirely
-          in your browser - nothing is sent to any server.
+          in your browser using WebCrypto Ed25519 - nothing is sent to any server.
         </p>
       </div>
 
@@ -120,9 +216,10 @@ export const VerifyPage: React.FC = () => {
       <div className="flex gap-3 mb-8">
         <button
           onClick={handleVerify}
-          disabled={!input.trim()}
-          className="px-4 py-2 bg-[#f0c674] text-[#0d1117] rounded-lg font-medium text-sm hover:bg-[#f0d694] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          disabled={!input.trim() || verifying}
+          className="px-4 py-2 bg-[#f0c674] text-[#0d1117] rounded-lg font-medium text-sm hover:bg-[#f0d694] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
+          {verifying && <Loader2 className="w-4 h-4 animate-spin" />}
           Verify
         </button>
         <button
@@ -145,7 +242,14 @@ export const VerifyPage: React.FC = () => {
             {result.valid ? (
               <>
                 <ShieldCheck className="w-8 h-8 text-[#3fb950]" />
-                <span className="text-2xl font-bold text-[#3fb950]">VERIFIED</span>
+                <div>
+                  <span className="text-2xl font-bold text-[#3fb950]">VERIFIED</span>
+                  {result.signature_verified && (
+                    <span className="ml-3 text-xs text-[#3fb950] bg-[#0d1117] border border-[#238636] px-2 py-0.5 rounded">
+                      Ed25519 signatures valid
+                    </span>
+                  )}
+                </div>
               </>
             ) : (
               <>
@@ -242,8 +346,8 @@ export const VerifyPage: React.FC = () => {
           )}
 
           <p className="text-[#484f58] text-xs mt-4">
-            Verified in browser. No server call. Ed25519 chain parsing only (cryptographic
-            signature verification requires WebCrypto Ed25519 support).
+            Verified in browser using WebCrypto Ed25519. No server call.
+            {result.signature_verified && ' All chain signatures cryptographically verified.'}
           </p>
         </div>
       )}

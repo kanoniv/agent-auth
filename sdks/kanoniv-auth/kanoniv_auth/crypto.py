@@ -2,11 +2,16 @@
 
 Key generation, DID creation, signing, and verification.
 Self-contained - no dependency on kanoniv-trust.
+
+DID method: did:agent:{sha256_hex_first_16_bytes}
+Matches the Rust kanoniv-agent-auth crate exactly.
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
+import datetime
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,131 +29,137 @@ class KeyPair:
     """Ed25519 key pair with DID."""
     private_key: Ed25519PrivateKey
     public_key: Ed25519PublicKey
-    did: str  # did:key:z6Mk...
+    did: str  # did:agent:{hash}
+    public_key_bytes: bytes  # raw 32-byte public key
 
     def sign(self, message: bytes) -> str:
+        """Sign a message. Returns hex-encoded signature."""
+        sig = self.private_key.sign(message)
+        return sig.hex()
+
+    def sign_b64(self, message: bytes) -> str:
         """Sign a message. Returns base64url-encoded signature."""
         sig = self.private_key.sign(message)
         return base64.urlsafe_b64encode(sig).decode()
 
     def export_private(self) -> str:
-        """Export private key as base64."""
+        """Export private key as base64url."""
         raw = self.private_key.private_bytes(
             serialization.Encoding.Raw,
             serialization.PrivateFormat.Raw,
             serialization.NoEncryption(),
         )
-        return base64.urlsafe_b64encode(raw).decode()
+        return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+    def export_private_hex(self) -> str:
+        """Export private key as hex (matches Rust key file format)."""
+        raw = self.private_key.private_bytes(
+            serialization.Encoding.Raw,
+            serialization.PrivateFormat.Raw,
+            serialization.NoEncryption(),
+        )
+        return raw.hex()
 
     def export_public(self) -> str:
-        """Export public key as base64."""
-        raw = self.public_key.public_bytes(
-            serialization.Encoding.Raw,
-            serialization.PublicFormat.Raw,
-        )
-        return base64.urlsafe_b64encode(raw).decode()
+        """Export public key as base64url."""
+        return base64.urlsafe_b64encode(self.public_key_bytes).decode().rstrip("=")
+
+    def export_public_hex(self) -> str:
+        """Export public key as hex."""
+        return self.public_key_bytes.hex()
 
     def save(self, path: str) -> None:
-        """Save key pair to a JSON file."""
+        """Save key pair to a JSON file (Rust-compatible format)."""
         p = Path(path).expanduser()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps({
             "did": self.did,
-            "private_key": self.export_private(),
+            "public_key": self.export_public_hex(),
+            "private_key": self.export_private_hex(),
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }, indent=2))
         p.chmod(0o600)
 
     @classmethod
     def load(cls, path: str) -> "KeyPair":
-        """Load key pair from a JSON file."""
+        """Load key pair from a JSON file (Rust-compatible format)."""
         data = json.loads(Path(path).expanduser().read_text())
-        return load_keys(data["private_key"])
+        if "private_key" in data:
+            priv_hex = data["private_key"]
+            # Support both hex (Rust format) and base64 (old Python format)
+            try:
+                raw = bytes.fromhex(priv_hex)
+            except ValueError:
+                raw = base64.urlsafe_b64decode(priv_hex + "==")
+            return load_keys_from_bytes(raw)
+        raise ValueError("Key file missing private_key field")
 
 
 def generate_keys() -> KeyPair:
-    """Generate a new Ed25519 key pair with a did:key identifier."""
+    """Generate a new Ed25519 key pair with a did:agent identifier."""
     private = Ed25519PrivateKey.generate()
     public = private.public_key()
-    did = _public_key_to_did(public)
-    return KeyPair(private_key=private, public_key=public, did=did)
+    pub_bytes = public.public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    did = _compute_did(pub_bytes)
+    return KeyPair(private_key=private, public_key=public, did=did, public_key_bytes=pub_bytes)
 
 
 def load_keys(private_key_b64: str) -> KeyPair:
-    """Load a key pair from a base64-encoded private key."""
-    raw = base64.urlsafe_b64decode(private_key_b64)
+    """Load a key pair from a base64url-encoded private key."""
+    # Add padding if needed
+    padded = private_key_b64 + "=" * (4 - len(private_key_b64) % 4) if len(private_key_b64) % 4 else private_key_b64
+    raw = base64.urlsafe_b64decode(padded)
+    return load_keys_from_bytes(raw)
+
+
+def load_keys_from_bytes(raw: bytes) -> KeyPair:
+    """Load a key pair from raw private key bytes."""
     private = Ed25519PrivateKey.from_private_bytes(raw)
     public = private.public_key()
-    did = _public_key_to_did(public)
-    return KeyPair(private_key=private, public_key=public, did=did)
+    pub_bytes = public.public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    did = _compute_did(pub_bytes)
+    return KeyPair(private_key=private, public_key=public, did=did, public_key_bytes=pub_bytes)
 
 
-def verify_signature(did: str, message: bytes, signature_b64: str) -> bool:
-    """Verify a signature against a DID's public key. Returns False on failure."""
+def load_keys_from_hex(hex_str: str) -> KeyPair:
+    """Load a key pair from hex-encoded private key (Rust key file format)."""
+    return load_keys_from_bytes(bytes.fromhex(hex_str))
+
+
+def verify_signature(did: str, message: bytes, signature_hex: str) -> bool:
+    """Verify a hex-encoded signature against a DID's public key."""
     try:
-        public_key = _did_to_public_key(did)
-        sig = base64.urlsafe_b64decode(signature_b64)
+        sig = bytes.fromhex(signature_hex)
+        # We need the public key - but did:agent only has a hash
+        # Verification requires the public key bytes directly
+        # This function works when called with public_key_bytes available
+        return False  # Cannot verify from DID alone with did:agent method
+    except (InvalidSignature, ValueError, IndexError):
+        return False
+
+
+def verify_signature_with_key(public_key_bytes: bytes, message: bytes, signature_hex: str) -> bool:
+    """Verify a hex-encoded signature with raw public key bytes."""
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(public_key_bytes)
+        sig = bytes.fromhex(signature_hex)
         public_key.verify(sig, message)
         return True
     except (InvalidSignature, ValueError, IndexError):
         return False
 
 
-def did_to_public_key(did: str) -> Ed25519PublicKey:
-    """Extract Ed25519 public key from a did:key identifier."""
-    return _did_to_public_key(did)
+def _compute_did(public_key_bytes: bytes) -> str:
+    """Compute did:agent DID from public key bytes.
 
-
-# --- Internal helpers ---
-
-def _public_key_to_did(public_key: Ed25519PublicKey) -> str:
-    """Convert an Ed25519 public key to a did:key identifier."""
-    raw = public_key.public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw,
-    )
-    multicodec = b"\xed\x01" + raw
-    encoded = _base58btc_encode(multicodec)
-    return f"did:key:z{encoded}"
-
-
-def _did_to_public_key(did: str) -> Ed25519PublicKey:
-    """Extract Ed25519 public key from a did:key identifier."""
-    if not did.startswith("did:key:z"):
-        raise ValueError(f"Unsupported DID method: {did}")
-    encoded = did[len("did:key:z"):]
-    decoded = _base58btc_decode(encoded)
-    if decoded[:2] != b"\xed\x01":
-        raise ValueError("Not an Ed25519 key: unexpected multicodec prefix")
-    return Ed25519PublicKey.from_public_bytes(decoded[2:])
-
-
-_B58_ALPHABET = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
-
-def _base58btc_encode(data: bytes) -> str:
-    n = int.from_bytes(data, "big")
-    result = []
-    while n > 0:
-        n, r = divmod(n, 58)
-        result.append(_B58_ALPHABET[r:r + 1])
-    for byte in data:
-        if byte == 0:
-            result.append(b"1")
-        else:
-            break
-    return b"".join(reversed(result)).decode()
-
-
-def _base58btc_decode(s: str) -> bytes:
-    n = 0
-    for char in s.encode():
-        n = n * 58 + _B58_ALPHABET.index(char)
-    byte_length = (n.bit_length() + 7) // 8
-    result = n.to_bytes(byte_length, "big") if byte_length > 0 else b""
-    pad = 0
-    for char in s.encode():
-        if char == _B58_ALPHABET[0]:
-            pad += 1
-        else:
-            break
-    return b"\x00" * pad + result
+    Uses SHA-256 hash, first 16 bytes as hex. Matches Rust crate exactly.
+    """
+    h = hashlib.sha256(public_key_bytes).digest()
+    short_hash = h[:16].hex()
+    return f"did:agent:{short_hash}"
