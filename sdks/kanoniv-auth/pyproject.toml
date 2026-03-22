@@ -31,3 +31,9 @@ kanoniv-auth = "kanoniv_auth.cli:main"
 [project.optional-dependencies]
 cli = ["click>=8.0"]
 dev = ["pytest", "pytest-cov"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["kanoniv_auth"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"kanoniv_auth/skill" = "kanoniv_auth/skill"

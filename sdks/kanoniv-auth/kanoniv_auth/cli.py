@@ -86,6 +86,48 @@ def init(output: str | None, force: bool):
     click.secho("  WARNING: Treat this like an SSH key. Don't share it.", fg="yellow", bold=True)
 
 
+@cli.command("install-skill")
+def install_skill_cmd():
+    """Install /delegate, /audit, and /status skills into Claude Code."""
+    from pathlib import Path
+    import shutil
+    import importlib.resources
+
+    skills_dir = Path.home() / ".claude" / "skills"
+    pkg_skill = Path(__file__).parent / "skill"
+
+    if not pkg_skill.exists():
+        click.echo("Error: skill files not found in package. Reinstall: pip install kanoniv-auth", err=True)
+        sys.exit(1)
+
+    # Install /delegate
+    delegate_dir = skills_dir / "delegate" / "bin"
+    delegate_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pkg_skill / "delegate.md", skills_dir / "delegate" / "SKILL.md")
+    for script in ["check-scope.sh", "check-edit-scope.sh", "log-action.sh"]:
+        dest = delegate_dir / script
+        shutil.copy2(pkg_skill / "bin" / script, dest)
+        dest.chmod(0o755)
+
+    # Install /audit
+    audit_dir = skills_dir / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pkg_skill / "audit" / "SKILL.md", audit_dir / "SKILL.md")
+
+    # Install /status
+    status_dir = skills_dir / "status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pkg_skill / "status" / "SKILL.md", status_dir / "SKILL.md")
+
+    click.secho("Installed 3 kanoniv-auth skills:", fg="green", bold=True)
+    click.echo()
+    click.echo("  /delegate  - Start a scoped session (with enforcement hooks)")
+    click.echo("  /audit     - View the agent audit trail")
+    click.echo("  /status    - Check current delegation status")
+    click.echo()
+    click.echo("Start Claude Code and type /delegate to begin.")
+
+
 @cli.command("delegate")
 @click.option("--scopes", "-s", required=True, help="Comma-separated scopes")
 @click.option("--ttl", "-t", default=None, help='Time-to-live (e.g. "4h", "30m")')
@@ -116,7 +158,7 @@ def delegate_cmd(scopes: str, ttl: str | None, name: str | None, key: str | None
                 load_root(key)
             else:
                 from pathlib import Path
-                default = str(Path("~/.kanoniv/root.key").expanduser())
+                default = str(Path(auth_module.DEFAULT_KEY_DIR).expanduser() / "root.key")
                 if Path(default).exists():
                     load_root(default)
                 else:
