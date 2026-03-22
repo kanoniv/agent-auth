@@ -7,6 +7,7 @@ import { AgentDetailPage } from './pages/AgentDetailPage';
 import { GraphPage } from './pages/GraphPage';
 import { ProvenancePage } from './pages/ProvenancePage';
 import { InteropPage } from './pages/InteropPage';
+import { VerifyPage } from './pages/VerifyPage';
 
 export const App: React.FC = () => (
   <ErrorBoundary>
@@ -18,6 +19,7 @@ export const App: React.FC = () => (
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/provenance" element={<ProvenancePage />} />
         <Route path="/interop" element={<InteropPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
       </Route>
     </Routes>
   </ErrorBoundary>

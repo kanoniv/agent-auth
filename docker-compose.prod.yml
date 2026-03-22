@@ -1,0 +1,54 @@
+services:
+  agent-trust-db:
+    image: postgres:16-alpine
+    container_name: agent-trust-db
+    environment:
+      POSTGRES_DB: agent_trust
+      POSTGRES_USER: agent_trust
+      POSTGRES_PASSWORD: agent_trust_prod
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - agent-trust-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_trust"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 256m
+    networks:
+      - kanoniv_default
+
+  agent-trust-api:
+    build:
+      context: ./apps/api
+    container_name: agent-trust-api
+    environment:
+      DATABASE_URL: postgres://agent_trust:agent_trust_prod@agent-trust-db:5432/agent_trust
+      PORT: "4100"
+    depends_on:
+      agent-trust-db:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+    networks:
+      - kanoniv_default
+
+  agent-trust-observatory:
+    build:
+      context: ./apps/observatory
+    container_name: agent-trust-observatory
+    depends_on:
+      - agent-trust-api
+    restart: unless-stopped
+    mem_limit: 128m
+    networks:
+      - kanoniv_default
+
+volumes:
+  agent-trust-pgdata:
+
+networks:
+  kanoniv_default:
+    external: true

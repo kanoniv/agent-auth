@@ -1,0 +1,227 @@
+name: 'Kanoniv Auth'
+description: 'Sudo for AI agents. Issue scoped delegation tokens for your CI/CD pipeline agents.'
+branding:
+  icon: 'shield'
+  color: 'yellow'
+
+inputs:
+  root_key:
+    description: 'Base64-encoded root private key (from kanoniv-auth init). Not needed if using OIDC mode.'
+    required: false
+  oidc:
+    description: 'Use OIDC to get an ephemeral root key from Kanoniv Cloud. Set to "true" to enable. Requires KANONIV_API_KEY secret.'
+    required: false
+    default: 'false'
+  api_key:
+    description: 'Kanoniv Cloud API key (required for OIDC mode)'
+    required: false
+  scopes:
+    description: 'Comma-separated scopes to delegate (e.g. "deploy.staging,build")'
+    required: true
+  ttl:
+    description: 'Token time-to-live (e.g. "4h", "30m", "1d")'
+    required: false
+    default: '4h'
+  version:
+    description: 'kanoniv-auth Python package version'
+    required: false
+    default: '0.1.0'
+  post_audit:
+    description: 'Post a delegation audit comment on the PR (true/false)'
+    required: false
+    default: 'false'
+
+outputs:
+  token:
+    description: 'The delegation token (set as KANONIV_TOKEN env var)'
+    value: ${{ steps.delegate.outputs.token }}
+  agent_did:
+    description: 'The delegated agent DID'
+    value: ${{ steps.delegate.outputs.agent_did }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install kanoniv-auth
+      shell: bash
+      run: pip install kanoniv-auth==${{ inputs.version }}
+
+    - name: Delegate scoped authority
+      id: delegate
+      shell: python3 {0}
+      env:
+        INPUT_ROOT_KEY: ${{ inputs.root_key }}
+        INPUT_SCOPES: ${{ inputs.scopes }}
+        INPUT_TTL: ${{ inputs.ttl }}
+        INPUT_OIDC: ${{ inputs.oidc }}
+        INPUT_API_KEY: ${{ inputs.api_key }}
+      run: |
+        import os
+        import json
+
+        from kanoniv_auth import delegate, verify
+        from kanoniv_auth.crypto import load_keys, generate_keys
+        import kanoniv_auth.auth as auth_module
+
+        oidc_mode = os.environ.get("INPUT_OIDC", "false").lower() == "true"
+
+        if oidc_mode:
+            # OIDC mode: get ephemeral root from Kanoniv Cloud
+            api_key = os.environ.get("INPUT_API_KEY", "")
+            if not api_key:
+                raise RuntimeError("OIDC mode requires api_key input (set KANONIV_API_KEY secret)")
+
+            import urllib.request
+            oidc_token = ""
+            try:
+                # Get GitHub OIDC token
+                oidc_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL", "")
+                oidc_bearer = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "")
+                if oidc_url and oidc_bearer:
+                    req = urllib.request.Request(
+                        f"{oidc_url}&audience=kanoniv",
+                        headers={"Authorization": f"bearer {oidc_bearer}"},
+                    )
+                    resp = urllib.request.urlopen(req)
+                    oidc_token = json.loads(resp.read())["value"]
+            except Exception as e:
+                raise RuntimeError(f"Failed to get GitHub OIDC token: {e}. Ensure 'permissions: id-token: write' is set in your workflow.")
+
+            if not oidc_token:
+                raise RuntimeError("OIDC token is empty. Ensure 'permissions: id-token: write' is set and ACTIONS_ID_TOKEN_REQUEST_URL is available.")
+
+            # Exchange OIDC token for ephemeral root key via Kanoniv Cloud
+            try:
+                req = urllib.request.Request(
+                    "https://api.kanoniv.com/v1/auth/oidc/root-key",
+                    data=json.dumps({"oidc_token": oidc_token}).encode(),
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                resp = urllib.request.urlopen(req)
+                root_data = json.loads(resp.read())
+                auth_module._root_keys = load_keys(root_data["root_key"])
+                print("Loaded ephemeral root key via OIDC")
+            except Exception as e:
+                raise RuntimeError(f"OIDC root key exchange failed: {e}. Falling back to root_key input.")
+        else:
+            # Direct mode: load root key from secret
+            root_key_b64 = os.environ.get("INPUT_ROOT_KEY", "")
+            if not root_key_b64:
+                raise RuntimeError("root_key input is required (or set oidc: true)")
+            auth_module._root_keys = load_keys(root_key_b64)
+
+        # Parse scopes
+        scopes = [s.strip() for s in os.environ["INPUT_SCOPES"].split(",") if s.strip()]
+        ttl = os.environ.get("INPUT_TTL", "4h")
+
+        # Issue delegation
+        token = delegate(scopes=scopes, ttl=ttl)
+
+        # Verify it works
+        result = verify(action=scopes[0], token=token)
+
+        # Set outputs
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write(f"token={token}\n")
+            f.write(f"agent_did={result['agent_did']}\n")
+
+        # Also set as env var for subsequent steps
+        with open(os.environ["GITHUB_ENV"], "a") as f:
+            f.write(f"KANONIV_TOKEN={token}\n")
+
+        print(f"Delegation issued:")
+        print(f"  Agent:  {result['agent_did']}")
+        print(f"  Scopes: {scopes}")
+        print(f"  TTL:    {ttl}")
+        print(f"  Chain:  {result['chain_depth']} link(s)")
+
+    - name: Post audit comment
+      if: inputs.post_audit == 'true' && github.event_name == 'pull_request'
+      shell: python3 {0}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        KANONIV_TOKEN: ${{ steps.delegate.outputs.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        import json
+        import os
+        import urllib.request
+
+        from kanoniv_auth import verify
+        from kanoniv_auth.auth import _decode_token
+
+        token = os.environ["KANONIV_TOKEN"]
+        data = _decode_token(token)
+        scopes = data.get("scopes", [])
+        chain = data.get("chain", [])
+        agent_did = data.get("agent_did", "unknown")
+
+        # Build chain visualization
+        chain_lines = []
+        for i, link in enumerate(chain):
+            issuer = link.get("issuer_did", "?")
+            delegate = link.get("delegate_did", "?")
+            indent = "  " * i
+            if i == 0:
+                short = issuer[:30] + "..." if len(issuer) > 30 else issuer
+                chain_lines.append(f"{short} (root)")
+            d_short = delegate[:30] + "..." if len(delegate) > 30 else delegate
+            chain_lines.append(f"{indent}  |-- {d_short}")
+
+        expires = data.get("expires_at")
+        if expires:
+            import time
+            remaining = expires - time.time()
+            if remaining > 3600:
+                ttl_str = f"{remaining/3600:.1f}h remaining"
+            elif remaining > 60:
+                ttl_str = f"{remaining/60:.0f}m remaining"
+            else:
+                ttl_str = f"{remaining:.0f}s remaining"
+        else:
+            ttl_str = "no expiry"
+
+        body = f"""## Delegation Audit
+
+        | Field | Value |
+        |-------|-------|
+        | Agent DID | `{agent_did[:40]}...` |
+        | Scopes | `{', '.join(scopes)}` |
+        | Chain depth | {len(chain)} link(s) |
+        | TTL | {ttl_str} |
+
+        <details>
+        <summary>Delegation Chain</summary>
+
+        ```
+        {chr(10).join(chain_lines)}
+        ```
+        </details>
+
+        > Verified by [kanoniv-auth](https://github.com/kanoniv/agent-auth). Every action in this pipeline is cryptographically scoped and signed.
+        """
+
+        # Clean up indentation
+        body = "\n".join(line.lstrip() for line in body.strip().split("\n"))
+
+        # Post PR comment
+        url = f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR_NUMBER']}/comments"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({"body": body}).encode(),
+            headers={
+                "Authorization": f"token {os.environ['GITHUB_TOKEN']}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(req)
+            print("Posted delegation audit comment on PR")
+        except Exception as e:
+            print(f"Warning: Failed to post PR comment: {e}")
