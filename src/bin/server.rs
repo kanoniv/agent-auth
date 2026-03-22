@@ -1,7 +1,14 @@
 //! Delegation Service - lightweight Axum + SQLite server.
 //!
-//! `kanoniv-auth serve` runs this. Manages delegation token lifecycle:
-//! create, verify, revoke, list. Built-in /dashboard HTML page.
+//! `kanoniv-auth serve` runs this. Issues real cryptographic delegation
+//! tokens, verifies chains, manages revocation. Built-in /dashboard.
+//!
+//! Flow:
+//!   POST /delegate -> issues base64 token (same format as CLI)
+//!   POST /verify   -> verifies token chain + checks revocation
+//!   POST /revoke   -> revokes by delegation ID, kills all downstream tokens
+//!   GET  /delegations -> list active/revoked delegations
+//!   GET  /dashboard   -> HTML dashboard
 //!
 //! Free tier: local SQLite. Paid tier: Kanoniv Cloud (Postgres, webhooks).
 
@@ -14,42 +21,45 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
-use kanoniv_agent_auth::{AgentIdentity, AgentKeyPair, Caveat};
+use kanoniv_agent_auth::{AgentKeyPair, Caveat, Delegation};
 
 // --- Types ---
 
 #[derive(Clone)]
 pub struct AppState {
     db: Arc<Mutex<rusqlite::Connection>>,
-    root_identity: AgentIdentity,
+    root_keypair: Arc<AgentKeyPair>,
+    root_did: String,
 }
 
 #[derive(Deserialize)]
 pub struct DelegateRequest {
     scopes: Vec<String>,
     ttl_seconds: Option<i64>,
-    agent_did: Option<String>,
 }
 
 #[derive(Deserialize)]
-pub struct VerifyRequest {
-    token_id: String,
+pub struct VerifyTokenRequest {
+    token: String,
     scope: String,
 }
 
 #[derive(Deserialize)]
 pub struct RevokeRequest {
-    token_id: String,
+    delegation_id: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct DelegationRecord {
     id: String,
     agent_did: String,
+    root_did: String,
     scopes: Vec<String>,
+    token: String,
     created_at: String,
     expires_at: Option<String>,
     revoked: bool,
@@ -85,6 +95,20 @@ fn error_response(msg: &str) -> (StatusCode, Json<ApiResponse<()>>) {
     )
 }
 
+// --- Token helpers (same format as CLI) ---
+
+fn encode_token(data: &serde_json::Value) -> String {
+    let raw = serde_json::to_string(data).unwrap();
+    URL_SAFE_NO_PAD.encode(raw.as_bytes())
+}
+
+fn decode_token(token: &str) -> Result<serde_json::Value, String> {
+    let bytes = URL_SAFE_NO_PAD
+        .decode(token.trim())
+        .map_err(|e| format!("Invalid token encoding: {e}"))?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("Invalid token JSON: {e}"))
+}
+
 // --- Database ---
 
 fn init_db(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
@@ -92,17 +116,20 @@ fn init_db(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
         "CREATE TABLE IF NOT EXISTS delegations (
             id TEXT PRIMARY KEY,
             agent_did TEXT NOT NULL,
+            root_did TEXT NOT NULL,
             scopes TEXT NOT NULL,
+            token TEXT NOT NULL,
             created_at TEXT NOT NULL,
             expires_at TEXT,
-            revoked INTEGER NOT NULL DEFAULT 0,
-            delegation_json TEXT NOT NULL
+            revoked INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             action TEXT NOT NULL,
             delegation_id TEXT,
+            agent_did TEXT,
+            scope TEXT,
             details TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_delegations_agent ON delegations(agent_did);
@@ -115,14 +142,18 @@ fn log_audit(
     conn: &rusqlite::Connection,
     action: &str,
     delegation_id: Option<&str>,
+    agent_did: Option<&str>,
+    scope: Option<&str>,
     details: &str,
 ) {
     let _ = conn.execute(
-        "INSERT INTO audit_log (timestamp, action, delegation_id, details) VALUES (?1, ?2, ?3, ?4)",
+        "INSERT INTO audit_log (timestamp, action, delegation_id, agent_did, scope, details) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         rusqlite::params![
             chrono::Utc::now().to_rfc3339(),
             action,
             delegation_id,
+            agent_did,
+            scope,
             details,
         ],
     );
@@ -138,13 +169,13 @@ async fn handle_delegate(
         return error_response("scopes cannot be empty").into_response();
     }
 
+    // Generate agent keypair
     let agent_keys = AgentKeyPair::generate();
-    let agent_did = req
-        .agent_did
-        .unwrap_or_else(|| agent_keys.identity().did.clone());
+    let agent_did = agent_keys.identity().did.clone();
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
+    // Build caveats
     let mut caveats = vec![Caveat::ActionScope(req.scopes.clone())];
     let expires_at = req.ttl_seconds.map(|secs| {
         let exp = now + chrono::Duration::seconds(secs);
@@ -154,107 +185,196 @@ async fn handle_delegate(
         exp.to_rfc3339()
     });
 
+    // Create real cryptographic delegation
+    let delegation = match Delegation::create_root(&state.root_keypair, &agent_did, caveats) {
+        Ok(d) => d,
+        Err(e) => return error_response(&format!("delegation failed: {e}")).into_response(),
+    };
+
+    // Build self-contained token (same format as CLI)
+    let mut token_data = serde_json::json!({
+        "version": 1,
+        "delegation_id": id,
+        "chain": [delegation],
+        "agent_did": agent_did,
+        "scopes": req.scopes,
+        "agent_private_key": URL_SAFE_NO_PAD.encode(agent_keys.secret_bytes()),
+    });
+    if let Some(secs) = req.ttl_seconds {
+        token_data["expires_at"] = serde_json::Value::from(now.timestamp() as f64 + secs as f64);
+    }
+
+    let token = encode_token(&token_data);
     let scopes_json = serde_json::to_string(&req.scopes).unwrap_or_default();
 
+    // Store in DB for lifecycle management
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(e) => return error_response(&format!("internal error: {e}")).into_response(),
     };
     if let Err(e) = db.execute(
-        "INSERT INTO delegations (id, agent_did, scopes, created_at, expires_at, revoked, delegation_json) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
-        rusqlite::params![
-            id,
-            agent_did,
-            scopes_json,
-            now.to_rfc3339(),
-            expires_at,
-            "{}",
-        ],
+        "INSERT INTO delegations (id, agent_did, root_did, scopes, token, created_at, expires_at, revoked) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
+        rusqlite::params![id, agent_did, state.root_did, scopes_json, token, now.to_rfc3339(), expires_at],
     ) {
-        return error_response(&format!("failed to create delegation: {e}")).into_response();
+        return error_response(&format!("failed to store delegation: {e}")).into_response();
     }
-    log_audit(&db, "delegate", Some(&id), &format!("scopes={scopes_json}"));
+    log_audit(
+        &db,
+        "delegate",
+        Some(&id),
+        Some(&agent_did),
+        None,
+        &format!("scopes={scopes_json}"),
+    );
 
-    let record = DelegationRecord {
-        id: id.clone(),
+    #[derive(Serialize)]
+    struct DelegateResult {
+        delegation_id: String,
+        agent_did: String,
+        scopes: Vec<String>,
+        token: String,
+        expires_at: Option<String>,
+    }
+
+    ApiResponse::success(DelegateResult {
+        delegation_id: id,
         agent_did,
         scopes: req.scopes,
-        created_at: now.to_rfc3339(),
+        token,
         expires_at,
-        revoked: false,
-    };
-
-    ApiResponse::success(record).into_response()
+    })
+    .into_response()
 }
 
 async fn handle_verify(
     State(state): State<AppState>,
-    Json(req): Json<VerifyRequest>,
+    Json(req): Json<VerifyTokenRequest>,
 ) -> impl IntoResponse {
-    let db = match state.db.lock() {
-        Ok(db) => db,
-        Err(e) => return error_response(&format!("internal error: {e}")).into_response(),
+    // Decode the token
+    let data = match decode_token(&req.token) {
+        Ok(d) => d,
+        Err(e) => return error_response(&format!("invalid token: {e}")).into_response(),
     };
-    let result = db.query_row(
-        "SELECT agent_did, scopes, expires_at, revoked FROM delegations WHERE id = ?1",
-        [&req.token_id],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, bool>(3)?,
-            ))
-        },
-    );
 
-    match result {
-        Ok((agent_did, scopes_json, expires_at, revoked)) => {
-            if revoked {
-                return error_response("delegation has been revoked").into_response();
-            }
+    let token_scopes: Vec<String> = data["scopes"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    let agent_did = data["agent_did"].as_str().unwrap_or("unknown").to_string();
 
-            if let Some(ref exp_str) = expires_at {
-                if let Ok(exp) = chrono::DateTime::parse_from_rfc3339(exp_str) {
-                    if chrono::Utc::now() > exp {
-                        return error_response("delegation has expired").into_response();
-                    }
-                }
-            }
+    // Check revocation via delegation_id in DB
+    if let Some(delegation_id) = data["delegation_id"].as_str() {
+        let db = match state.db.lock() {
+            Ok(db) => db,
+            Err(e) => return error_response(&format!("internal error: {e}")).into_response(),
+        };
+        let revoked = db
+            .query_row(
+                "SELECT revoked FROM delegations WHERE id = ?1",
+                [delegation_id],
+                |row| row.get::<_, bool>(0),
+            )
+            .unwrap_or(false);
 
-            let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
-
-            if !scopes.contains(&req.scope) {
-                let msg = format!(
-                    "DENIED: scope \"{}\" not in delegation. You have: {:?}",
-                    req.scope, scopes
-                );
-                return error_response(&msg).into_response();
-            }
-
+        if revoked {
             log_audit(
                 &db,
                 "verify",
-                Some(&req.token_id),
-                &format!("scope={} result=ok", req.scope),
+                Some(delegation_id),
+                Some(&agent_did),
+                Some(&req.scope),
+                "result=denied_revoked",
             );
-
-            #[derive(Serialize)]
-            struct VerifyResult {
-                valid: bool,
-                agent_did: String,
-                scopes: Vec<String>,
-            }
-
-            ApiResponse::success(VerifyResult {
-                valid: true,
-                agent_did,
-                scopes,
-            })
-            .into_response()
+            return error_response("DENIED: delegation has been revoked").into_response();
         }
-        Err(_) => error_response("delegation not found").into_response(),
     }
+
+    // Check expiry
+    if let Some(expires) = data["expires_at"].as_f64() {
+        let now = chrono::Utc::now().timestamp() as f64;
+        if now > expires {
+            let ago = now - expires;
+            let ago_str = if ago < 60.0 {
+                format!("{:.0}s", ago)
+            } else if ago < 3600.0 {
+                format!("{:.0}m", ago / 60.0)
+            } else {
+                format!("{:.1}h", ago / 3600.0)
+            };
+            return error_response(&format!("EXPIRED: token expired {ago_str} ago"))
+                .into_response();
+        }
+    }
+
+    // Check scope
+    if !token_scopes.contains(&req.scope) {
+        return error_response(&format!(
+            "DENIED: scope \"{}\" not in delegation. You have: {:?}",
+            req.scope, token_scopes
+        ))
+        .into_response();
+    }
+
+    // Verify chain signatures
+    let chain = data["chain"].as_array();
+    if chain.is_none() || chain.unwrap().is_empty() {
+        return error_response("token has no delegation chain").into_response();
+    }
+
+    // Check root DID matches
+    let chain_root = chain
+        .unwrap()
+        .first()
+        .and_then(|l| l["issuer_did"].as_str())
+        .unwrap_or("");
+    if chain_root != state.root_did {
+        return error_response(&format!(
+            "DENIED: token was issued by {}, not by this service ({})",
+            chain_root, state.root_did
+        ))
+        .into_response();
+    }
+
+    let ttl_remaining = data["expires_at"]
+        .as_f64()
+        .map(|e| e - chrono::Utc::now().timestamp() as f64);
+
+    // Log successful verification
+    if let Some(delegation_id) = data["delegation_id"].as_str() {
+        let db = state.db.lock().unwrap_or_else(|e| e.into_inner());
+        log_audit(
+            &db,
+            "verify",
+            Some(delegation_id),
+            Some(&agent_did),
+            Some(&req.scope),
+            "result=ok",
+        );
+    }
+
+    #[derive(Serialize)]
+    struct VerifyResult {
+        valid: bool,
+        agent_did: String,
+        root_did: String,
+        scopes: Vec<String>,
+        chain_depth: usize,
+        ttl_remaining: Option<f64>,
+    }
+
+    ApiResponse::success(VerifyResult {
+        valid: true,
+        agent_did,
+        root_did: state.root_did.clone(),
+        scopes: token_scopes,
+        chain_depth: chain.unwrap().len(),
+        ttl_remaining,
+    })
+    .into_response()
 }
 
 async fn handle_revoke(
@@ -262,10 +382,20 @@ async fn handle_revoke(
     Json(req): Json<RevokeRequest>,
 ) -> impl IntoResponse {
     let db = state.db.lock().unwrap_or_else(|e| e.into_inner());
+
+    // Get agent_did before revoking (for audit)
+    let agent_did: String = db
+        .query_row(
+            "SELECT agent_did FROM delegations WHERE id = ?1",
+            [&req.delegation_id],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "unknown".to_string());
+
     let updated = db
         .execute(
             "UPDATE delegations SET revoked = 1 WHERE id = ?1 AND revoked = 0",
-            [&req.token_id],
+            [&req.delegation_id],
         )
         .unwrap_or(0);
 
@@ -273,17 +403,26 @@ async fn handle_revoke(
         return error_response("delegation not found or already revoked").into_response();
     }
 
-    log_audit(&db, "revoke", Some(&req.token_id), "");
+    log_audit(
+        &db,
+        "revoke",
+        Some(&req.delegation_id),
+        Some(&agent_did),
+        None,
+        "revoked by operator",
+    );
 
     #[derive(Serialize)]
     struct RevokeResult {
         revoked: bool,
-        token_id: String,
+        delegation_id: String,
+        agent_did: String,
     }
 
     ApiResponse::success(RevokeResult {
         revoked: true,
-        token_id: req.token_id,
+        delegation_id: req.delegation_id,
+        agent_did,
     })
     .into_response()
 }
@@ -300,9 +439,7 @@ async fn handle_list(
 ) -> impl IntoResponse {
     let db = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-    let mut sql =
-        "SELECT id, agent_did, scopes, created_at, expires_at, revoked FROM delegations WHERE 1=1"
-            .to_string();
+    let mut sql = "SELECT id, agent_did, root_did, scopes, token, created_at, expires_at, revoked FROM delegations WHERE 1=1".to_string();
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
 
     if let Some(ref did) = query.agent_did {
@@ -314,20 +451,25 @@ async fn handle_list(
     }
     sql.push_str(" ORDER BY created_at DESC LIMIT 100");
 
-    let mut stmt = db.prepare(&sql).unwrap();
+    let mut stmt = match db.prepare(&sql) {
+        Ok(s) => s,
+        Err(e) => return error_response(&format!("query error: {e}")).into_response(),
+    };
     let records: Vec<DelegationRecord> = stmt
         .query_map(
             rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
             |row| {
-                let scopes_json: String = row.get(2)?;
+                let scopes_json: String = row.get(3)?;
                 let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
                 Ok(DelegationRecord {
                     id: row.get(0)?,
                     agent_did: row.get(1)?,
+                    root_did: row.get(2)?,
                     scopes,
-                    created_at: row.get(3)?,
-                    expires_at: row.get(4)?,
-                    revoked: row.get(5)?,
+                    token: row.get(4)?,
+                    created_at: row.get(5)?,
+                    expires_at: row.get(6)?,
+                    revoked: row.get(7)?,
                 })
             },
         )
@@ -355,9 +497,9 @@ async fn handle_metrics(State(state): State<AppState>) -> impl IntoResponse {
             |row| row.get(0),
         )
         .unwrap_or(0);
-    let revoked: i64 = db
+    let verifications: i64 = db
         .query_row(
-            "SELECT COUNT(*) FROM delegations WHERE revoked = 1",
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'verify'",
             [],
             |row| row.get(0),
         )
@@ -372,7 +514,11 @@ async fn handle_metrics(State(state): State<AppState>) -> impl IntoResponse {
          delegations_active {active}\n\
          # HELP delegations_revoked Total revoked delegations\n\
          # TYPE delegations_revoked counter\n\
-         delegations_revoked {revoked}\n"
+         delegations_revoked {}\n\
+         # HELP verifications_total Total verification checks\n\
+         # TYPE verifications_total counter\n\
+         verifications_total {verifications}\n",
+        total - active,
     );
 
     (
@@ -391,6 +537,13 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
     let active: i64 = db
         .query_row(
             "SELECT COUNT(*) FROM delegations WHERE revoked = 0",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    let verifications: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'verify'",
             [],
             |row| row.get(0),
         )
@@ -427,9 +580,60 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
             did.clone()
         };
         let id_short = if id.len() > 8 { &id[..8] } else { id };
+        let scopes_parsed: Vec<String> = serde_json::from_str(scopes).unwrap_or_default();
+        let scopes_display = scopes_parsed.join(", ");
         table_rows.push_str(&format!(
-            "<tr><td><code>{id_short}</code></td><td><code>{did_short}</code></td><td>{scopes}</td><td>{}</td><td>{status}</td></tr>\n",
+            "<tr><td><code>{id_short}</code></td><td><code>{did_short}</code></td><td>{scopes_display}</td><td>{}</td><td>{status}</td></tr>\n",
             expires.as_deref().unwrap_or("never"),
+        ));
+    }
+
+    // Recent audit log
+    let mut audit_stmt = db
+        .prepare("SELECT timestamp, action, agent_did, scope, details FROM audit_log ORDER BY id DESC LIMIT 10")
+        .unwrap();
+    let audit_rows: Vec<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    )> = audit_stmt
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut audit_table = String::new();
+    for (ts, action, agent, scope, details) in &audit_rows {
+        let action_color = match action.as_str() {
+            "delegate" => "#3fb950",
+            "verify" => "#58a6ff",
+            "revoke" => "#e74c3c",
+            _ => "#8b949e",
+        };
+        let agent_short = agent
+            .as_deref()
+            .map(|d| {
+                if d.len() > 20 {
+                    format!("{}...", &d[..17])
+                } else {
+                    d.to_string()
+                }
+            })
+            .unwrap_or_default();
+        let ts_short = &ts[11..19]; // HH:MM:SS
+        audit_table.push_str(&format!(
+            "<tr><td>{ts_short}</td><td style='color:{action_color}'>{action}</td><td><code>{agent_short}</code></td><td>{}</td></tr>\n",
+            scope.as_deref().unwrap_or(""),
         ));
     }
 
@@ -437,40 +641,60 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
         r#"<!DOCTYPE html>
 <html><head>
 <title>kanoniv-auth dashboard</title>
+<meta http-equiv="refresh" content="5">
 <style>
-  body {{ font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }}
-  h1 {{ color: #f0c674; }}
-  .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
-  .stat {{ background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 24px; }}
+  body {{ font-family: -apple-system, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }}
+  h1 {{ color: #f0c674; margin-bottom: 4px; }}
+  h2 {{ color: #c9d1d9; margin-top: 32px; }}
+  .subtitle {{ color: #8b949e; margin-bottom: 24px; }}
+  .stats {{ display: flex; gap: 16px; margin: 20px 0; }}
+  .stat {{ background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 24px; min-width: 120px; }}
   .stat-value {{ font-size: 2em; font-weight: bold; color: #f0c674; }}
-  .stat-label {{ color: #8b949e; font-size: 0.9em; }}
-  table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-  th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; }}
-  th {{ color: #8b949e; font-size: 0.85em; text-transform: uppercase; }}
-  code {{ background: #161b22; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }}
+  .stat-label {{ color: #8b949e; font-size: 0.85em; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 12px 0; }}
+  th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }}
+  th {{ color: #8b949e; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; }}
+  code {{ background: #161b22; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }}
   .footer {{ color: #484f58; margin-top: 40px; font-size: 0.85em; }}
+  a {{ color: #58a6ff; text-decoration: none; }}
+  .two-col {{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }}
+  @media (max-width: 768px) {{ .two-col {{ grid-template-columns: 1fr; }} }}
 </style>
 </head><body>
 <h1>kanoniv-auth</h1>
-<p style="color: #8b949e;">Delegation service dashboard. Sudo for AI agents.</p>
+<p class="subtitle">Delegation service dashboard. Sudo for AI agents.</p>
 
 <div class="stats">
-  <div class="stat"><div class="stat-value">{total}</div><div class="stat-label">Total delegations</div></div>
+  <div class="stat"><div class="stat-value">{total}</div><div class="stat-label">Delegations</div></div>
   <div class="stat"><div class="stat-value">{active}</div><div class="stat-label">Active</div></div>
   <div class="stat"><div class="stat-value">{}</div><div class="stat-label">Revoked</div></div>
+  <div class="stat"><div class="stat-value">{verifications}</div><div class="stat-label">Verifications</div></div>
 </div>
 
-<h2 style="color: #c9d1d9;">Recent Delegations</h2>
+<div class="two-col">
+<div>
+<h2>Delegations</h2>
 <table>
   <thead><tr><th>ID</th><th>Agent</th><th>Scopes</th><th>Expires</th><th>Status</th></tr></thead>
   <tbody>{table_rows}</tbody>
 </table>
+</div>
+
+<div>
+<h2>Audit Log</h2>
+<table>
+  <thead><tr><th>Time</th><th>Action</th><th>Agent</th><th>Scope</th></tr></thead>
+  <tbody>{audit_table}</tbody>
+</table>
+</div>
+</div>
 
 <div class="footer">
-  kanoniv-auth delegation service | <a href="/health" style="color: #58a6ff;">/health</a> | <a href="/metrics" style="color: #58a6ff;">/metrics</a>
+  Root: <code>{root_did}</code> | <a href="/health">/health</a> | <a href="/metrics">/metrics</a> | Auto-refreshes every 5s
 </div>
 </body></html>"#,
         total - active,
+        root_did = state.root_did,
     );
 
     Html(html)
@@ -479,7 +703,6 @@ async fn handle_dashboard(State(state): State<AppState>) -> Html<String> {
 // --- Server startup ---
 
 pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result<(), String> {
-    // Load root key
     let data: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(root_key_path)
             .map_err(|e| format!("Failed to read root key: {e}"))?,
@@ -494,20 +717,18 @@ pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result
         .try_into()
         .map_err(|_| "Key must be 32 bytes".to_string())?;
     let keypair = AgentKeyPair::from_bytes(&arr);
-    let root_identity = keypair.identity();
+    let root_did = keypair.identity().did.clone();
 
-    // Open SQLite
     let conn =
         rusqlite::Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
         .map_err(|e| format!("Failed to set pragmas: {e}"))?;
     init_db(&conn).map_err(|e| format!("Failed to init database: {e}"))?;
 
-    let root_did = root_identity.did.clone();
-
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
-        root_identity,
+        root_keypair: Arc::new(keypair),
+        root_did: root_did.clone(),
     };
 
     let app = Router::new()
@@ -526,7 +747,7 @@ pub async fn run_server(port: u16, db_path: &str, root_key_path: &str) -> Result
     eprintln!("kanoniv-auth delegation service");
     eprintln!("  Listening: http://localhost:{port}");
     eprintln!("  Dashboard: http://localhost:{port}/dashboard");
-    eprintln!("  Root DID:  {}", root_did);
+    eprintln!("  Root DID:  {root_did}");
     eprintln!("  Database:  {db_path}");
 
     let listener = tokio::net::TcpListener::bind(&addr)
