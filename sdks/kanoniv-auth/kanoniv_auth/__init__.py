@@ -21,7 +21,7 @@ from kanoniv_auth.errors import (
 from kanoniv_auth.crypto import KeyPair, generate_keys, load_keys
 from kanoniv_auth.registry import register_agent, get_agent, list_agents, resolve_name
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __all__ = [
     "delegate",
     "verify",

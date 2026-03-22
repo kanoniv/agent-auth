@@ -179,4 +179,4 @@ class TestVersion:
     def test_version_flag(self, runner):
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "0.2.1" in result.output
+        assert "0.2.2" in result.output
