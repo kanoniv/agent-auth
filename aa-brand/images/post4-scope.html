@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700;800;900&display=swap');
+
+  body {
+    width: 1200px;
+    height: 628px;
+    background: #07070d;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 50px 80px;
+  }
+
+  .top-bar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(0, 255, 170, 0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+  }
+
+  .headline {
+    font-size: 44px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    margin-bottom: 50px;
+  }
+
+  .headline .glow {
+    background: linear-gradient(135deg, #00ffaa, #00aaff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .scope-tree {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+    padding-left: 40px;
+  }
+
+  .scope-level {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 0;
+    position: relative;
+  }
+
+  .scope-level::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+  }
+
+  .scope-text {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 10px 24px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+
+  .scope-level.root .scope-text {
+    color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .scope-level.mid .scope-text {
+    color: rgba(0, 170, 255, 0.6);
+    background: rgba(0, 170, 255, 0.04);
+    border: 1px solid rgba(0, 170, 255, 0.1);
+  }
+
+  .scope-level.narrow .scope-text {
+    color: #00ffaa;
+    background: rgba(0, 255, 170, 0.06);
+    border: 1px solid rgba(0, 255, 170, 0.2);
+  }
+
+  .arrow-down {
+    font-size: 16px;
+    color: rgba(0, 255, 170, 0.2);
+    padding-left: 0;
+    margin: -4px 0;
+  }
+
+  .annotation {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.2);
+    margin-left: 16px;
+    letter-spacing: 1px;
+  }
+
+  .annotation.green { color: rgba(0, 255, 170, 0.4); }
+
+  .result-box {
+    position: absolute;
+    bottom: 50px;
+    right: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 20px 28px;
+    border-radius: 10px;
+    background: rgba(0, 255, 170, 0.04);
+    border: 1px solid rgba(0, 255, 170, 0.12);
+  }
+
+  .result-box .pass {
+    font-size: 13px;
+    color: #00ffaa;
+    margin-bottom: 6px;
+  }
+
+  .result-box .fail {
+    font-size: 13px;
+    color: #ff4444;
+  }
+
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.05), #00ffaa, #00aaff, rgba(255,255,255,0.05));
+  }
+
+  .brand {
+    position: absolute;
+    bottom: 24px;
+    left: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.2);
+  }
+  .brand span { color: #00ffaa; }
+</style>
+</head>
+<body>
+  <div class="bottom-bar"></div>
+
+  <div class="content">
+    <div class="top-bar">Kanoniv / Agent Auth</div>
+
+    <div class="headline">
+      Scopes can only <span class="glow">narrow</span>.<br>
+      Never widen.
+    </div>
+
+    <div class="scope-tree">
+      <div class="scope-level root">
+        <div class="scope-text">agent.*</div>
+        <div class="annotation">root scope - full access</div>
+      </div>
+      <div class="arrow-down">&nbsp;&nbsp;&nbsp;|</div>
+      <div class="scope-level mid">
+        <div class="scope-text">agent.deploy.*</div>
+        <div class="annotation">narrowed - deploy only</div>
+      </div>
+      <div class="arrow-down">&nbsp;&nbsp;&nbsp;|</div>
+      <div class="scope-level narrow">
+        <div class="scope-text">agent.deploy.staging</div>
+        <div class="annotation green">narrowed - staging only. cryptographically enforced.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-box">
+    <div class="pass">verify("deploy.staging") -> PASS</div>
+    <div class="fail">verify("deploy.prod") &nbsp; -> DENIED</div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.15); margin-top: 8px;">// Ed25519 signature mismatch</div>
+  </div>
+
+  <div class="brand"><span>agent-auth</span> // github.com/kanoniv</div>
+</body>
+</html>

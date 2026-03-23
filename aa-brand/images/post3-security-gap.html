@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700;800;900&display=swap');
+
+  body {
+    width: 1200px;
+    height: 628px;
+    background: #07070d;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 50px 80px;
+  }
+
+  .top-bar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(0, 255, 170, 0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+  }
+
+  .headline {
+    font-size: 48px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    margin-bottom: 50px;
+  }
+
+  .headline .red { color: #ff4444; }
+  .headline .dim { color: rgba(255, 255, 255, 0.2); }
+
+  .comparison {
+    display: flex;
+    gap: 30px;
+    flex: 1;
+    align-items: stretch;
+  }
+
+  .col {
+    flex: 1;
+    border-radius: 12px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .col.before {
+    background: rgba(255, 68, 68, 0.04);
+    border: 1px solid rgba(255, 68, 68, 0.12);
+  }
+
+  .col.after {
+    background: rgba(0, 255, 170, 0.04);
+    border: 1px solid rgba(0, 255, 170, 0.15);
+  }
+
+  .col-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .col.before .col-label { color: rgba(255, 68, 68, 0.6); }
+  .col.after .col-label { color: rgba(0, 255, 170, 0.6); }
+
+  .code-block {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    flex: 1;
+  }
+
+  .col.before .code-block { color: rgba(255, 255, 255, 0.35); }
+  .col.after .code-block { color: rgba(0, 255, 170, 0.7); }
+
+  .strike { text-decoration: line-through; color: rgba(255, 68, 68, 0.3); }
+  .comment { color: rgba(255, 255, 255, 0.15); }
+
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #ff4444, #00ffaa);
+  }
+
+  .brand {
+    position: absolute;
+    bottom: 24px;
+    right: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.2);
+  }
+  .brand span { color: #00ffaa; }
+
+  .arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: rgba(255, 255, 255, 0.1);
+    padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="bottom-bar"></div>
+
+  <div class="content">
+    <div class="top-bar">Kanoniv / Agent Auth</div>
+
+    <div class="headline">
+      <span class="dim">Teams are shipping agents.</span><br>
+      <span class="red">The identity layer is missing.</span>
+    </div>
+
+    <div class="comparison">
+      <div class="col before">
+        <div class="col-label">Today: API Keys</div>
+        <div class="code-block">
+          <span class="comment"># static secret</span><br>
+          <span class="strike">API_KEY=sk-xxxx...</span><br>
+          <span class="strike">scope: everything</span><br>
+          <span class="strike">expires: never</span><br>
+          <span class="strike">audit: none</span><br>
+          <span class="strike">verify: network call</span>
+        </div>
+      </div>
+
+      <div class="arrow">-></div>
+
+      <div class="col after">
+        <div class="col-label">Agent Auth: Delegation</div>
+        <div class="code-block">
+          <span class="comment"># cryptographic token</span><br>
+          token = delegate(<br>
+          &nbsp;&nbsp;scope="deploy.staging",<br>
+          &nbsp;&nbsp;ttl="4h",<br>
+          &nbsp;&nbsp;audit=True<br>
+          ) &nbsp;# Ed25519 signed
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="brand"><span>agent-auth</span> // github.com/kanoniv</div>
+</body>
+</html>

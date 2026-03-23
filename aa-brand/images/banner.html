@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700;800&display=swap');
+
+  body {
+    width: 1128px;
+    height: 191px;
+    background: #0a0a0f;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Subtle grid background */
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 255, 170, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 170, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Animated glow line */
+  .glow-line {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00ffaa, #00aaff, transparent);
+  }
+
+  /* Left accent bar */
+  .accent-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #00ffaa, #00aaff);
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0 60px 0 40px;
+  }
+
+  .left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tagline {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  .tagline .highlight {
+    background: linear-gradient(135deg, #00ffaa, #00aaff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: rgba(0, 255, 170, 0.6);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .scope-chain {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .scope-chain .active {
+    color: #00ffaa;
+  }
+
+  .frameworks {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.25);
+    display: flex;
+    gap: 12px;
+  }
+
+  /* Floating nodes decoration */
+  .node {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ffaa;
+    opacity: 0.15;
+  }
+  .node:nth-child(1) { top: 30px; right: 300px; }
+  .node:nth-child(2) { top: 80px; right: 350px; opacity: 0.08; width: 4px; height: 4px; }
+  .node:nth-child(3) { top: 50px; right: 280px; opacity: 0.1; width: 8px; height: 8px; background: #00aaff; }
+
+  .line-deco {
+    position: absolute;
+    top: 60px;
+    right: 310px;
+    width: 50px;
+    height: 1px;
+    background: rgba(0, 255, 170, 0.08);
+    transform: rotate(-30deg);
+  }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="accent-bar"></div>
+  <div class="glow-line"></div>
+
+  <div class="node"></div>
+  <div class="node"></div>
+  <div class="node"></div>
+  <div class="line-deco"></div>
+
+  <div class="content">
+    <div class="left">
+      <div class="tagline">
+        The <span class="highlight">Cryptographic Identity Engine</span><br>for AI Agents
+      </div>
+      <div class="subtitle">Identity. Delegation. Audit. One Primitive.</div>
+    </div>
+    <div class="right">
+      <div class="scope-chain">
+        scope: agent.*<br>
+        <span class="active">scope: agent.deploy.staging</span><br>
+        verify: Ed25519 ✓<br>
+        ttl: 3600s
+      </div>
+      <div class="frameworks">
+        <span>Claude</span>
+        <span>CrewAI</span>
+        <span>LangGraph</span>
+        <span>OpenAI</span>
+        <span>AutoGen</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

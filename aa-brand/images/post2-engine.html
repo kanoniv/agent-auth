@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700;800;900&display=swap');
+
+  body {
+    width: 1200px;
+    height: 628px;
+    background: #07070d;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 170, 255, 0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 170, 255, 0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    padding: 50px 80px;
+    gap: 60px;
+  }
+
+  .left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top-bar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(0, 255, 170, 0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+  }
+
+  .headline {
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    margin-bottom: 24px;
+  }
+
+  .headline .glow {
+    background: linear-gradient(135deg, #00ffaa, #00aaff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .sub {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1.6;
+    max-width: 440px;
+  }
+
+  .right {
+    width: 460px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    position: relative;
+  }
+
+  /* Engine visualization */
+  .engine-core {
+    background: rgba(0, 255, 170, 0.06);
+    border: 1px solid rgba(0, 255, 170, 0.15);
+    border-radius: 12px;
+    padding: 20px 28px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #00ffaa;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .engine-core::before {
+    content: 'ENGINE';
+    position: absolute;
+    top: -8px;
+    left: 28px;
+    font-size: 8px;
+    letter-spacing: 3px;
+    background: #07070d;
+    padding: 0 8px;
+    color: rgba(0, 255, 170, 0.4);
+  }
+
+  .connector {
+    width: 1px;
+    height: 16px;
+    background: rgba(0, 255, 170, 0.15);
+    margin: 0 auto;
+  }
+
+  .verticals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .vertical {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    line-height: 1.4;
+  }
+
+  .vertical .v-label {
+    color: rgba(0, 170, 255, 0.7);
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #00ffaa, #00aaff, #00ffaa);
+  }
+
+  .brand {
+    position: absolute;
+    bottom: 24px;
+    right: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.2);
+  }
+
+  .brand span { color: #00ffaa; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="bottom-bar"></div>
+
+  <div class="content">
+    <div class="left">
+      <div class="top-bar">Kanoniv / Agent Auth</div>
+      <div class="headline">
+        <span class="glow">One engine.</span><br>
+        Many verticals.
+      </div>
+      <div class="sub">
+        Agent Auth is infrastructure. The primitive layer that powers CI/CD security, multi-tenant delegation, compliance audit, cross-company trust, and more.
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="engine-core">
+        Ed25519 Cryptographic Delegation
+      </div>
+      <div class="connector"></div>
+      <div class="verticals">
+        <div class="vertical">
+          <div class="v-label">CI/CD Security</div>
+          deploy.staging ✓<br>
+          deploy.prod ✗
+        </div>
+        <div class="vertical">
+          <div class="v-label">Multi-Tenant</div>
+          tenant.acme.read ✓<br>
+          tenant.other.* ✗
+        </div>
+        <div class="vertical">
+          <div class="v-label">Compliance Audit</div>
+          signed chain ✓<br>
+          immutable proof
+        </div>
+        <div class="vertical">
+          <div class="v-label">Cross-Company Trust</div>
+          offline verify ✓<br>
+          no shared db
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="brand"><span>agent-auth</span> // github.com/kanoniv</div>
+</body>
+</html>

@@ -80,6 +80,9 @@ export const ProvenancePage: React.FC = () => {
         {filtered.map((entry, i) => {
           const isExp = expanded === entry.id;
           const dotColor = actionColors[entry.action] || 'bg-zinc-500';
+          const meta = entry.metadata as Record<string, any>;
+          const isMcp = meta?.type === 'mcp_tool_call';
+          const risk = meta?.risk as Record<string, any> | undefined;
           return (
             <motion.div
               key={entry.id}
@@ -106,26 +109,127 @@ export const ProvenancePage: React.FC = () => {
               >
                 <div className="flex items-center gap-3 px-4 py-3">
                   <span className="text-xs font-medium text-[#E8E8ED]">{entry.agent_name}</span>
-                  <span className={cn(
-                    'text-[10px] px-1.5 py-0.5 rounded',
-                    entry.action === 'delegate' ? 'bg-[#C5A572]/10 text-[#C5A572]' :
-                    entry.action === 'register' ? 'bg-emerald-500/10 text-emerald-400' :
-                    entry.action === 'revoke' ? 'bg-red-500/10 text-red-400' :
-                    'bg-zinc-500/10 text-zinc-400'
-                  )}>
-                    {entry.action}
-                  </span>
-                  {entry.entity_ids.length > 0 && (
-                    <span className="text-[10px] font-mono text-zinc-600 flex-1 truncate">
-                      {entry.entity_ids.map(id => shortId(id)).join(', ')}
-                    </span>
+                  {meta?.type === 'mcp_tool_call' ? (
+                    <>
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded font-mono',
+                        meta.status === 'denied' ? 'bg-red-500/10 text-red-400' :
+                        'bg-emerald-500/10 text-emerald-400'
+                      )}>
+                        {meta.tool}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded font-medium',
+                        meta.status === 'denied' ? 'bg-red-500/15 text-red-400' :
+                        'bg-emerald-500/15 text-emerald-400'
+                      )}>
+                        {meta.status === 'denied' ? '✗ DENIED' : '✓ ALLOWED'}
+                      </span>
+                      {risk?.risk_level && (
+                        <span className={cn(
+                          'text-[9px] px-1.5 py-0.5 rounded',
+                          risk?.risk_level === 'critical' ? 'bg-red-500/10 text-red-400' :
+                          risk?.risk_level === 'high' ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-zinc-500/10 text-zinc-400'
+                        )}>
+                          {(risk?.risk_level as string).toUpperCase()}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded',
+                        entry.action === 'delegate' ? 'bg-[#C5A572]/10 text-[#C5A572]' :
+                        entry.action === 'register' ? 'bg-emerald-500/10 text-emerald-400' :
+                        entry.action === 'revoke' ? 'bg-red-500/10 text-red-400' :
+                        'bg-zinc-500/10 text-zinc-400'
+                      )}>
+                        {entry.action}
+                      </span>
+                      {entry.entity_ids.length > 0 && (
+                        <span className="text-[10px] font-mono text-zinc-600 flex-1 truncate">
+                          {entry.entity_ids.map(id => shortId(id)).join(', ')}
+                        </span>
+                      )}
+                    </>
                   )}
-                  <span className="text-[10px] text-zinc-600 shrink-0">{timeAgo(entry.created_at)}</span>
+                  <span className="text-[10px] text-zinc-600 shrink-0 ml-auto">{timeAgo(entry.created_at)}</span>
                 </div>
-                {isExp && Object.keys(entry.metadata).length > 0 && (
+
+                {/* Expanded view - MCP tool call with rich rendering */}
+                {isExp && meta?.type === 'mcp_tool_call' && (
+                  <div className="px-4 pb-4 border-t border-white/5 mt-0">
+                    {meta.status === 'denied' && risk && (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <div className="text-[10px] text-[#C5A572] font-medium mb-1.5">Risk Prevented</div>
+                          {(risk?.consequences as string[])?.map((c: string, i: number) => (
+                            <div key={i} className="text-[11px] text-zinc-400 flex gap-2">
+                              <span className="text-red-400 shrink-0">-</span> {c}
+                            </div>
+                          ))}
+                        </div>
+
+                        {(risk?.compliance as string[])?.length > 0 && (
+                          <div>
+                            <div className="text-[10px] text-[#C5A572] font-medium mb-1">Compliance Impact</div>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {(risk?.compliance as string[]).map((c: string) => (
+                                <span key={c} className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <div className="text-[10px] text-[#C5A572] font-medium mb-1">Context</div>
+                          <div className="text-[11px] text-zinc-400">
+                            Agent: <span className="text-zinc-300 font-mono">{entry.agent_name}</span>
+                            {meta.agent_did && meta.agent_did !== 'unknown' && (
+                              <span className="text-zinc-600 font-mono ml-1">({meta.agent_did})</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-zinc-400">{meta.deny_reason}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-[#C5A572] font-medium mb-1">Remediation</div>
+                          {(risk?.remediation as string[])?.map((r: string, i: number) => (
+                            <div key={i} className="text-[11px] text-zinc-400 flex gap-2">
+                              <span className="text-[#C5A572] shrink-0">-</span> {r}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {meta.status === 'allowed' && (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-[11px] text-zinc-400">
+                          Tool: <span className="text-zinc-300 font-mono">{meta.tool}</span>
+                        </div>
+                        {meta.args_summary && (
+                          <div className="text-[11px] text-zinc-400">
+                            Args: <span className="text-zinc-500 font-mono">{meta.args_summary}</span>
+                          </div>
+                        )}
+                        <div className="text-[11px] text-zinc-400">
+                          Duration: <span className="text-zinc-300">{meta.duration_ms}ms</span>
+                          {' '} Result: <span className="text-emerald-400">{meta.downstream_result}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Expanded view - regular provenance (raw JSON) */}
+                {isExp && meta?.type !== 'mcp_tool_call' && Object.keys(meta).length > 0 && (
                   <div className="px-4 pb-3 border-t border-white/5">
                     <pre className="text-[9px] text-zinc-500 mt-2 overflow-x-auto whitespace-pre-wrap">
-                      {JSON.stringify(entry.metadata, null, 2)}
+                      {JSON.stringify(meta, null, 2)}
                     </pre>
                   </div>
                 )}

@@ -29,6 +29,17 @@ export const ACTION_DOT_COLORS: Record<string, string> = {
   resolve: 'bg-blue-400',
   merge: 'bg-purple-400',
   mutate: 'bg-amber-400',
+  // MCP tool calls use tool: prefix
+  'tool:search_customers': 'bg-emerald-400',
+  'tool:search_invoices': 'bg-emerald-400',
+  'tool:search_vendors': 'bg-emerald-400',
+  'tool:search_bills': 'bg-emerald-400',
+  'tool:delete_bill': 'bg-red-400',
+  'tool:delete_customer': 'bg-red-400',
+  'tool:delete_vendor': 'bg-red-400',
+  'tool:create_invoice': 'bg-blue-400',
+  'tool:create_journal_entry': 'bg-amber-400',
+  'tool:create_employee': 'bg-amber-400',
 };
 
 /** Badge colors for action labels (ActivityFeed, ProvenancePage) */
