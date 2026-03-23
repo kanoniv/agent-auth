@@ -3,8 +3,8 @@ import {
   Users,
   Waypoints,
   Shield,
-  Globe,
   ShieldCheck,
+  Wrench,
 } from 'lucide-react';
 
 export const GOLD = '#C5A572';
@@ -55,8 +55,8 @@ export const ACTION_BADGE_COLORS: Record<string, string> = {
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { id: 'agents', label: 'Agents', icon: Users, path: '/agents' },
+  { id: 'tools', label: 'Tools', icon: Wrench, path: '/tools' },
   { id: 'graph', label: 'Trust Graph', icon: Waypoints, path: '/graph' },
   { id: 'provenance', label: 'Provenance', icon: Shield, path: '/provenance' },
-  { id: 'interop', label: 'Interop', icon: Globe, path: '/interop' },
   { id: 'verify', label: 'Verify', icon: ShieldCheck, path: '/verify' },
 ] as const;

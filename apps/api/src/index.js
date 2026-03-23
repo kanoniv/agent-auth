@@ -598,6 +598,90 @@ const llmToolDefs = [
   { name: 'create_memory', description: 'Create a memory entry', input_schema: { type: 'object', properties: { entry_type: { type: 'string', enum: ['knowledge', 'decision', 'investigation', 'pattern'] }, title: { type: 'string' }, content: { type: 'string' }, linked_agents: { type: 'array', items: { type: 'string' } } }, required: ['title'] } },
 ];
 
+// ---------------------------------------------------------------------------
+// Tools (discovered from MCP servers)
+// ---------------------------------------------------------------------------
+
+app.post('/v1/tools/register', async (req, res) => {
+  const { tools, provider } = req.body;
+  if (!tools || !Array.isArray(tools)) return res.status(400).json({ error: 'tools array required' });
+
+  const results = [];
+  for (const tool of tools) {
+    try {
+      const category = tool.name.startsWith('search') || tool.name.startsWith('get') || tool.name.startsWith('read') ? 'read'
+        : tool.name.startsWith('create') || tool.name.startsWith('update') ? 'write'
+        : tool.name.startsWith('delete') ? 'delete' : 'unknown';
+
+      const result = await pool.query(
+        `INSERT INTO tools (name, description, provider, category, input_schema, risk_level, risk_action, risk_consequences, risk_compliance, risk_remediation)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (name, provider) DO UPDATE SET
+           description = EXCLUDED.description,
+           input_schema = EXCLUDED.input_schema,
+           last_seen_at = now(),
+           risk_level = COALESCE(EXCLUDED.risk_level, tools.risk_level),
+           risk_action = COALESCE(EXCLUDED.risk_action, tools.risk_action),
+           risk_consequences = COALESCE(EXCLUDED.risk_consequences, tools.risk_consequences),
+           risk_compliance = COALESCE(EXCLUDED.risk_compliance, tools.risk_compliance),
+           risk_remediation = COALESCE(EXCLUDED.risk_remediation, tools.risk_remediation)
+         RETURNING *`,
+        [
+          tool.name,
+          tool.description || null,
+          provider || 'quickbooks',
+          category,
+          tool.inputSchema ? JSON.stringify(tool.inputSchema) : null,
+          tool.risk?.risk || null,
+          tool.risk?.action || null,
+          tool.risk?.consequences || null,
+          tool.risk?.compliance || null,
+          tool.risk?.remediation || null,
+        ]
+      );
+      results.push(result.rows[0]);
+    } catch (e) {
+      console.error(`Failed to register tool ${tool.name}:`, e.message);
+    }
+  }
+  res.json({ registered: results.length, tools: results });
+});
+
+app.get('/v1/tools', async (req, res) => {
+  try {
+    const { provider, category } = req.query;
+    let query = 'SELECT * FROM tools';
+    const params = [];
+    const conditions = [];
+    if (provider) { conditions.push(`provider = $${params.length + 1}`); params.push(provider); }
+    if (category) { conditions.push(`category = $${params.length + 1}`); params.push(category); }
+    if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
+    query += ' ORDER BY category, name';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/v1/tools/:name/called', async (req, res) => {
+  const { status } = req.body;
+  try {
+    const field = status === 'denied' ? 'deny_count' : 'call_count';
+    await pool.query(
+      `UPDATE tools SET ${field} = ${field} + 1, last_seen_at = now() WHERE name = $1`,
+      [req.params.name]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
 app.post('/v1/chat', async (req, res) => {
   const { message, conversation_id, mode } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });
