@@ -38,6 +38,7 @@ export const ClientDetailPage: React.FC = () => {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [unassigningAgent, setUnassigningAgent] = useState<string | null>(null);
 
   if (loading) {
@@ -84,8 +85,6 @@ export const ClientDetailPage: React.FC = () => {
     await unassignAgent(agentName);
     setUnassigningAgent(null);
   };
-
-  const [syncError, setSyncError] = useState<string | null>(null);
 
   const handleSync = async () => {
     setSyncing(true);
