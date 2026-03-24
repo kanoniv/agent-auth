@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, Bell, CheckCircle2, XCircle, AlertTriangle, Activity, ArrowRight, PanelLeftClose, PanelLeftOpen,
+  Settings, Bell, CheckCircle2, XCircle, AlertTriangle, Activity, ArrowRight, PanelLeftClose, PanelLeftOpen, LogOut,
 } from 'lucide-react';
 import { NAV_ITEMS } from '@/lib/constants';
 import { cn, timeAgo, safeGetItem, safeSetItem } from '@/lib/utils';
 import { useConnection } from '@/hooks/useConnection';
 import { useMemory } from '@/hooks/useMemory';
 import { SettingsPanel } from './SettingsPanel';
+import { useAuth } from '@/hooks/useAuth';
 import type { OutcomeEntry } from '@/lib/types';
 
 function outcomeIcon(result: string) {
@@ -22,6 +23,30 @@ function outcomeIcon(result: string) {
 
 function agentFromAuthor(author: string): string {
   return author.startsWith('agent:') ? author.slice(6) : author;
+}
+
+function LogoutButton({ expanded }: { expanded: boolean }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const handleLogout = () => { logout(); navigate('/login'); };
+  return (
+    <motion.button
+      aria-label="Sign out"
+      className="w-full flex items-center h-9 px-3 gap-3 text-sm text-[#8B8B96] hover:text-[#F87171] transition-colors"
+      onClick={handleLogout}
+      whileHover={{ backgroundColor: 'rgba(248,113,113,0.05)' }}
+      transition={{ duration: 0.1 }}
+    >
+      <LogOut className="w-5 h-5 shrink-0" />
+      <motion.span
+        className="whitespace-nowrap"
+        animate={{ opacity: expanded ? 1 : 0 }}
+        transition={{ duration: 0.15 }}
+      >
+        Sign out
+      </motion.span>
+    </motion.button>
+  );
 }
 
 export const Layout: React.FC = () => {
@@ -172,6 +197,7 @@ export const Layout: React.FC = () => {
               Settings
             </motion.span>
           </motion.button>
+          <LogoutButton expanded={sidebarExpanded || sidebarHovered} />
         </div>
       </motion.nav>
 
