@@ -847,6 +847,215 @@ app.delete('/v1/chat/conversations/:id', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Escalations
+// ---------------------------------------------------------------------------
+
+// Create escalation request (from AP agent when denied)
+app.post('/v1/escalations', async (req, res) => {
+  const { agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data } = req.body;
+  if (!agent_did || !reason) return res.status(400).json({ error: 'agent_did and reason required' });
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO escalations (agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [agent_did, agent_name || 'unknown', action, amount, vendor, vendor_confidence, reason, invoice_data ? JSON.stringify(invoice_data) : null]
+    );
+    await recordProvenance(agentName(req), 'escalation.created', [], { escalation_id: result.rows[0].id, reason, amount }, agent_did);
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// List escalations (filter by status)
+app.get('/v1/escalations', async (req, res) => {
+  const { status, agent_did, limit = 50 } = req.query;
+  try {
+    let query = 'SELECT * FROM escalations';
+    const params = [];
+    const conditions = [];
+
+    if (status) {
+      params.push(status);
+      conditions.push(`status = $${params.length}`);
+    }
+    if (agent_did) {
+      params.push(agent_did);
+      conditions.push(`agent_did = $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    // Auto-expire old pending escalations
+    await pool.query(
+      `UPDATE escalations SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()`
+    );
+
+    params.push(parseInt(limit));
+    query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get single escalation
+app.get('/v1/escalations/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM escalations WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Approve escalation - issues single-use delegation token
+app.post('/v1/escalations/:id/approve', async (req, res) => {
+  const approver = agentName(req);
+  try {
+    // Atomic update: only approve if still pending
+    const result = await pool.query(
+      `UPDATE escalations
+       SET status = 'approved', approved_by = $2, resolved_at = NOW()
+       WHERE id = $1 AND status = 'pending' AND expires_at > NOW()
+       RETURNING *`,
+      [req.params.id, approver]
+    );
+
+    if (result.rows.length === 0) {
+      // Check why it failed
+      const existing = await pool.query('SELECT status, expires_at FROM escalations WHERE id = $1', [req.params.id]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: 'not found' });
+      if (existing.rows[0].status !== 'pending') return res.status(409).json({ error: `already ${existing.rows[0].status}` });
+      if (new Date(existing.rows[0].expires_at) < new Date()) return res.status(410).json({ error: 'escalation expired' });
+      return res.status(500).json({ error: 'update failed' });
+    }
+
+    const esc = result.rows[0];
+
+    // Generate single-use approval token (5-min TTL)
+    const tokenExpiry = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const tokenPayload = {
+      agent_did: esc.agent_did,
+      agent_name: esc.agent_name,
+      scopes: [esc.action],
+      max_cost: parseFloat(esc.amount) || undefined,
+      expires_at: tokenExpiry,
+      escalation_id: esc.id,
+    };
+    const approvalToken = Buffer.from(JSON.stringify(tokenPayload)).toString('base64');
+
+    // Store the token
+    await pool.query(
+      `UPDATE escalations SET approval_token = $2, approval_token_expires_at = $3 WHERE id = $1`,
+      [req.params.id, approvalToken, tokenExpiry]
+    );
+
+    await recordProvenance(approver, 'escalation.approved', [], {
+      escalation_id: esc.id, amount: esc.amount, agent: esc.agent_name
+    }, esc.agent_did);
+
+    res.json({ ...esc, status: 'approved', approval_token: approvalToken, approval_token_expires_at: tokenExpiry });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Deny escalation
+app.post('/v1/escalations/:id/deny', async (req, res) => {
+  const { reason } = req.body;
+  const denier = agentName(req);
+  try {
+    const result = await pool.query(
+      `UPDATE escalations
+       SET status = 'denied', denial_reason = $2, approved_by = $3, resolved_at = NOW()
+       WHERE id = $1 AND status = 'pending'
+       RETURNING *`,
+      [req.params.id, reason || 'denied by reviewer', denier]
+    );
+
+    if (result.rows.length === 0) {
+      const existing = await pool.query('SELECT status FROM escalations WHERE id = $1', [req.params.id]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: 'not found' });
+      return res.status(409).json({ error: `already ${existing.rows[0].status}` });
+    }
+
+    const esc = result.rows[0];
+    await recordProvenance(denier, 'escalation.denied', [], {
+      escalation_id: esc.id, reason: reason || 'denied', agent: esc.agent_name
+    }, esc.agent_did);
+
+    res.json(esc);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Spend Summary (aggregated from provenance)
+// ---------------------------------------------------------------------------
+
+app.get('/v1/spend/summary', async (req, res) => {
+  try {
+    // Aggregate today's spend from provenance entries that have amount in metadata
+    const result = await pool.query(`
+      SELECT
+        agent_name,
+        agent_did,
+        COUNT(*) FILTER (WHERE metadata->>'status' = 'allowed' OR metadata->>'status' IS NULL) as allowed_count,
+        COUNT(*) FILTER (WHERE metadata->>'status' = 'denied') as denied_count,
+        COALESCE(SUM((metadata->>'amount')::numeric) FILTER (WHERE metadata->>'status' = 'allowed' OR metadata->>'status' IS NULL), 0) as total_spend
+      FROM provenance
+      WHERE created_at >= CURRENT_DATE
+        AND action LIKE 'accounting.write%'
+      GROUP BY agent_name, agent_did
+      ORDER BY total_spend DESC
+    `);
+
+    const agents = result.rows.map(row => ({
+      agent_did: row.agent_did,
+      agent_name: row.agent_name,
+      daily_spend: parseFloat(row.total_spend) || 0,
+      allowed_count: parseInt(row.allowed_count) || 0,
+      denied_count: parseInt(row.denied_count) || 0,
+    }));
+
+    res.json({
+      date: new Date().toISOString().split('T')[0],
+      agents,
+      total_spend: agents.reduce((sum, a) => sum + a.daily_spend, 0),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Escalation stats for dashboard
+app.get('/v1/escalations/stats', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'approved') as approved,
+        COUNT(*) FILTER (WHERE status = 'denied') as denied,
+        COUNT(*) FILTER (WHERE status = 'expired') as expired,
+        COUNT(*) as total
+      FROM escalations
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+    `);
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
 const port = parseInt(process.env.PORT || '4100');

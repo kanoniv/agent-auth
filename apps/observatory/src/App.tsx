@@ -8,6 +8,7 @@ import { GraphPage } from './pages/GraphPage';
 import { ProvenancePage } from './pages/ProvenancePage';
 import { ToolsPage } from './pages/ToolsPage';
 import { VerifyPage } from './pages/VerifyPage';
+import { EscalationsPage } from './pages/EscalationsPage';
 
 export const App: React.FC = () => (
   <ErrorBoundary>
@@ -17,6 +18,7 @@ export const App: React.FC = () => (
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/agents/:name" element={<AgentDetailPage />} />
         <Route path="/tools" element={<ToolsPage />} />
+        <Route path="/escalations" element={<EscalationsPage />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/provenance" element={<ProvenancePage />} />
         <Route path="/verify" element={<VerifyPage />} />

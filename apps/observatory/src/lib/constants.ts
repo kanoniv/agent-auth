@@ -5,6 +5,7 @@ import {
   Shield,
   ShieldCheck,
   Wrench,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const GOLD = '#C5A572';
@@ -12,6 +13,15 @@ export const GOLD = '#C5A572';
 export const DEFAULT_SCOPES = [
   'read', 'write', 'execute', 'delegate', 'admin',
 ];
+
+export const DELEGATION_TEMPLATES = [
+  { label: 'Custom', scopes: [], maxCost: undefined, description: 'Configure manually' },
+  { label: 'AP Clerk', scopes: ['accounting.read', 'accounting.write.create_bill', 'accounting.write.create_vendor'], maxCost: 5000, description: 'Routine invoices up to $5K' },
+  { label: 'AP Manager', scopes: ['accounting.read', 'accounting.write'], maxCost: 25000, description: 'Most invoices up to $25K' },
+  { label: 'Controller', scopes: ['accounting'], maxCost: 100000, description: 'Full accounting up to $100K' },
+  { label: 'Bookkeeper', scopes: ['accounting.read', 'accounting.write.categorize'], maxCost: 0, description: 'Read + categorize only, no payments' },
+  { label: 'Tax Preparer', scopes: ['accounting.read'], maxCost: 0, description: 'Read-only access for tax prep' },
+] as const;
 
 export const EXPIRY_OPTIONS = [
   { label: '1 hour', value: 1 },
@@ -56,6 +66,7 @@ export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { id: 'agents', label: 'Agents', icon: Users, path: '/agents' },
   { id: 'tools', label: 'Tools', icon: Wrench, path: '/tools' },
+  { id: 'escalations', label: 'Escalations', icon: AlertTriangle, path: '/escalations' },
   { id: 'graph', label: 'Trust Graph', icon: Waypoints, path: '/graph' },
   { id: 'provenance', label: 'Provenance', icon: Shield, path: '/provenance' },
   { id: 'verify', label: 'Verify', icon: ShieldCheck, path: '/verify' },

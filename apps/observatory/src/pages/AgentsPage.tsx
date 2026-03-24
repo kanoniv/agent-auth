@@ -40,8 +40,10 @@ export const AgentsPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Grant form
+  // Grant/Edit form
   const [showGrantForm, setShowGrantForm] = useState(false);
+  const [editingDelegationId, setEditingDelegationId] = useState<string | null>(null);
+  const [grantGrantor, setGrantGrantor] = useState('firm-admin');
   const [grantScopes, setGrantScopes] = useState<string[]>([]);
   const [grantCustomScope, setGrantCustomScope] = useState('');
   const [grantExpiry, setGrantExpiry] = useState(0);
@@ -117,25 +119,49 @@ export const AgentsPage: React.FC = () => {
     if (grantMaxCost) caveats.max_cost = parseFloat(grantMaxCost);
     if (grantResources) caveats.resources = grantResources.split(',').map(s => s.trim()).filter(Boolean);
     try {
-      await apiFetch('/v1/delegations', {
-        method: 'POST',
-        body: JSON.stringify({
-          agent_name: selectedName,
-          scopes: grantScopes,
-          expires_at: expiresAt,
-          ...(Object.keys(caveats).length > 0 ? { metadata: caveats } : {}),
-        }),
-      });
-      setShowGrantForm(false);
-      setGrantScopes([]);
-      setGrantCustomScope('');
-      setGrantExpiry(0);
-      setGrantMaxCost('');
-      setGrantResources('');
-      setGrantShowCaveats(false);
+      if (editingDelegationId) {
+        // Update existing delegation
+        await apiFetch(`/v1/delegations/${editingDelegationId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ scopes: grantScopes }),
+        });
+      } else {
+        // Create new delegation with explicit grantor
+        await apiFetch('/v1/delegations', {
+          method: 'POST',
+          headers: { 'X-Agent-Name': grantGrantor },
+          body: JSON.stringify({
+            grantor_name: grantGrantor,
+            agent_name: selectedName,
+            scopes: grantScopes,
+            expires_at: expiresAt,
+            ...(Object.keys(caveats).length > 0 ? { metadata: caveats } : {}),
+          }),
+        });
+      }
+      resetGrantForm();
       refetchAll();
     } catch (err) { setActionError(errorMessage(err, 'Failed to grant delegation')); }
     finally { setActionLoading(false); }
+  };
+
+  const resetGrantForm = () => {
+    setShowGrantForm(false);
+    setEditingDelegationId(null);
+    setGrantScopes([]);
+    setGrantCustomScope('');
+    setGrantExpiry(0);
+    setGrantMaxCost('');
+    setGrantResources('');
+    setGrantShowCaveats(false);
+    setGrantGrantor('firm-admin');
+  };
+
+  const handleEditDelegation = (delegation: { id: string; grantor_name: string; scopes: string[] }) => {
+    setEditingDelegationId(delegation.id);
+    setGrantGrantor(delegation.grantor_name);
+    setGrantScopes([...delegation.scopes]);
+    setShowGrantForm(true);
   };
 
   const handleRevoke = async (id: string) => {
@@ -491,6 +517,27 @@ export const AgentsPage: React.FC = () => {
 
                   {showGrantForm && (
                     <div className="rounded-lg bg-[#0a0a0f] border border-[#C5A572]/20 p-3 space-y-3">
+                      {/* Title */}
+                      <div className="text-[10px] font-semibold text-[#C5A572]">
+                        {editingDelegationId ? 'Edit Delegation' : 'New Delegation'}
+                      </div>
+
+                      {/* Grantor picker */}
+                      {!editingDelegationId && (
+                        <div>
+                          <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">Grantor (who authorizes)</label>
+                          <select
+                            value={grantGrantor}
+                            onChange={e => setGrantGrantor(e.target.value)}
+                            className="w-full text-xs bg-[#12121a] border border-white/[.07] rounded-lg px-2.5 py-1.5 text-zinc-300"
+                          >
+                            {agents.filter(a => a.name !== selectedName).map(a => (
+                              <option key={a.name} value={a.name}>{a.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       {/* Scope selection */}
                       <div>
                         <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">Scopes</label>
@@ -597,13 +644,21 @@ export const AgentsPage: React.FC = () => {
 
                       <button onClick={handleGrantDelegation} disabled={grantScopes.length === 0 || actionLoading}
                         className="w-full text-xs py-2 rounded-lg bg-[#C5A572] text-[#0a0a0f] font-bold disabled:opacity-50 hover:bg-[#D4BC94] transition-colors">
-                        Grant Delegation
+                        {editingDelegationId ? 'Update Delegation' : 'Grant Delegation'}
                       </button>
+                      {editingDelegationId && (
+                        <button onClick={resetGrantForm}
+                          className="w-full text-xs py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">
+                          Cancel
+                        </button>
+                      )}
                     </div>
                   )}
 
                   {selectedDelegations.map(d => (
-                    <DelegationCard key={d.id} delegation={d} onRevoke={handleRevoke} onRemoveScope={handleRemoveScope} />
+                    <div key={d.id} onClick={() => handleEditDelegation(d)} className="cursor-pointer">
+                      <DelegationCard delegation={d} onRevoke={handleRevoke} onRemoveScope={handleRemoveScope} />
+                    </div>
                   ))}
                 </div>
               )}
