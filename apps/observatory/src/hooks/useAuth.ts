@@ -32,24 +32,24 @@ export function useAuth() {
 
   const isAuthenticated = !!state.jwt;
 
-  const login = useCallback(async (email: string, password: string): Promise<{ ok: boolean; error?: string }> => {
+  const login = useCallback(async (email: string, password: string, tenant_id: string): Promise<{ ok: boolean; error?: string }> => {
     setState(s => ({ ...s, loading: true }));
     try {
       const resp = await fetch(`${CP_API_URL}/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, tenant_id }),
       });
       const data = await resp.json();
       if (!resp.ok) {
         setState(s => ({ ...s, loading: false }));
-        return { ok: false, error: data.error || `Login failed (${resp.status})` };
+        return { ok: false, error: data.detail || data.error || `Login failed (${resp.status})` };
       }
       const jwt = data.access_token || data.token;
       const refresh = data.refresh_token;
       if (jwt) localStorage.setItem(JWT_KEY, jwt);
       if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
-      const user: User = { email, tenant_id: data.tenant_id };
+      const user: User = { email, tenant_id };
       localStorage.setItem(USER_KEY, JSON.stringify(user));
       setState({ jwt, user, loading: false });
       return { ok: true };
@@ -72,13 +72,15 @@ export function useAuth() {
       const data = await resp.json();
       if (!resp.ok) {
         setState(s => ({ ...s, loading: false }));
-        return { ok: false, error: data.error || `Signup failed (${resp.status})` };
+        return { ok: false, error: data.detail || data.error || `Signup failed (${resp.status})` };
       }
-      const jwt = data.access_token || data.token;
-      const refresh = data.refresh_token;
+      // Cannon signup nests tokens under data.auth
+      const authData = data.auth || data;
+      const jwt = authData.access_token || authData.token;
+      const refresh = authData.refresh_token;
       if (jwt) localStorage.setItem(JWT_KEY, jwt);
       if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
-      const user: User = { email, first_name, last_name, company, tenant_id: data.tenant_id };
+      const user: User = { email, first_name, last_name, company, tenant_id: data.tenant_slug };
       localStorage.setItem(USER_KEY, JSON.stringify(user));
       setState({ jwt, user, loading: false });
       return { ok: true };

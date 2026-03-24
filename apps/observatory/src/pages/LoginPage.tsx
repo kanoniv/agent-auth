@@ -9,12 +9,13 @@ export const LoginPage: React.FC = () => {
   const { login, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tenantId, setTenantId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const result = await login(email, password);
+    const result = await login(email, password, tenantId);
     if (result.ok) {
       navigate('/');
     } else {
@@ -52,6 +53,17 @@ export const LoginPage: React.FC = () => {
                 autoFocus
                 className="w-full bg-[#0a0a0f] border border-white/[.07] rounded-lg px-3 py-2.5 text-sm text-[#E8E8ED] focus:outline-none focus:border-[#C5A572]/40 transition-colors"
                 placeholder="you@company.com"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1.5 block">Company ID</label>
+              <input
+                type="text"
+                value={tenantId}
+                onChange={e => setTenantId(e.target.value)}
+                required
+                className="w-full bg-[#0a0a0f] border border-white/[.07] rounded-lg px-3 py-2.5 text-sm text-[#E8E8ED] focus:outline-none focus:border-[#C5A572]/40 transition-colors"
+                placeholder="your-company-slug"
               />
             </div>
             <div>
