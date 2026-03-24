@@ -10,6 +10,8 @@ import { ToolsPage } from './pages/ToolsPage';
 import { VerifyPage } from './pages/VerifyPage';
 import { EscalationsPage } from './pages/EscalationsPage';
 import { AuditPage } from './pages/AuditPage';
+import { ClientsPage } from './pages/ClientsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { ConnectPage } from './pages/ConnectPage';
@@ -32,6 +34,8 @@ export const App: React.FC = () => (
       {/* Protected routes */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/agents/:name" element={<AgentDetailPage />} />
         <Route path="/tools" element={<ToolsPage />} />
