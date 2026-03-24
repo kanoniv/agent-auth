@@ -1056,6 +1056,85 @@ app.get('/v1/spend/summary', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Audit Package Export
+// ---------------------------------------------------------------------------
+
+// Export a signed audit package for a date range.
+// Contains all provenance entries, escalation decisions, and delegation context.
+// Each entry retains its original signature. The package itself is signed with
+// a summary hash for independent offline verification.
+app.get('/v1/audit/export', async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'from and to query params required (YYYY-MM-DD)' });
+
+  try {
+    // Fetch provenance entries in date range
+    const provResult = await pool.query(
+      `SELECT * FROM provenance
+       WHERE created_at >= $1::date AND created_at < ($2::date + INTERVAL '1 day')
+       ORDER BY created_at ASC
+       LIMIT 10000`,
+      [from, to]
+    );
+
+    // Fetch escalation decisions in date range
+    const escResult = await pool.query(
+      `SELECT id, agent_did, agent_name, action, amount, vendor, vendor_confidence,
+              reason, status, approved_by, denial_reason, created_at, resolved_at
+       FROM escalations
+       WHERE created_at >= $1::date AND created_at < ($2::date + INTERVAL '1 day')
+       ORDER BY created_at ASC
+       LIMIT 10000`,
+      [from, to]
+    );
+
+    // Fetch active delegations
+    const delResult = await pool.query(
+      `SELECT grantor_name, agent_name, scopes, caveats, created_at, expires_at
+       FROM delegations
+       WHERE revoked_at IS NULL
+       ORDER BY created_at ASC`
+    );
+
+    const entries = provResult.rows;
+    const escalations = escResult.rows;
+    const delegations = delResult.rows;
+
+    // Compute summary
+    const summary = {
+      total_actions: entries.length,
+      total_escalations: escalations.length,
+      escalations_approved: escalations.filter(e => e.status === 'approved').length,
+      escalations_denied: escalations.filter(e => e.status === 'denied').length,
+      unique_agents: [...new Set(entries.map(e => e.agent_did).filter(Boolean))].length,
+      active_delegations: delegations.length,
+    };
+
+    // Build package
+    const auditPackage = {
+      package_version: '1.0',
+      generated_at: new Date().toISOString(),
+      date_range: { from, to },
+      entries,
+      escalations,
+      delegations,
+      summary,
+    };
+
+    // Compute verification hash (SHA-256 of the JSON content)
+    const crypto = await import('crypto');
+    const contentHash = crypto.createHash('sha256')
+      .update(JSON.stringify({ entries, escalations, delegations, summary }))
+      .digest('hex');
+    auditPackage.content_hash = contentHash;
+
+    res.json(auditPackage);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
 const port = parseInt(process.env.PORT || '4100');

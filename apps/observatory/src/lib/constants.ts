@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Wrench,
   AlertTriangle,
+  FileCheck,
 } from 'lucide-react';
 
 export const GOLD = '#C5A572';
@@ -67,6 +68,7 @@ export const NAV_ITEMS = [
   { id: 'agents', label: 'Agents', icon: Users, path: '/agents' },
   { id: 'tools', label: 'Tools', icon: Wrench, path: '/tools' },
   { id: 'escalations', label: 'Escalations', icon: AlertTriangle, path: '/escalations' },
+  { id: 'audit', label: 'Audit', icon: FileCheck, path: '/audit' },
   { id: 'graph', label: 'Trust Graph', icon: Waypoints, path: '/graph' },
   { id: 'provenance', label: 'Provenance', icon: Shield, path: '/provenance' },
   { id: 'verify', label: 'Verify', icon: ShieldCheck, path: '/verify' },
