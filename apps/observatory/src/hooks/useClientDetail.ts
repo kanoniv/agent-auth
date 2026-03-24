@@ -72,60 +72,55 @@ export function useClientDetail(clientId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (signal?: { cancelled: boolean }) => {
     if (!clientId) return;
-    let cancelled = false;
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch client detail from CP API
       const clientResp = await cpFetch(`/v1/clients/${clientId}`);
-      if (cancelled) return;
+      if (signal?.cancelled) return;
       if (!clientResp.ok) {
         setError(`Failed to load client (${clientResp.status})`);
         setLoading(false);
         return;
       }
       const clientData: ClientDetail = await clientResp.json();
-      if (cancelled) return;
+      if (signal?.cancelled) return;
       setClient(clientData);
 
-      // Fetch QB data if connected (parallel, best-effort)
       const promises: Promise<void>[] = [];
 
       if (clientData.quickbooks_connected) {
         promises.push(
           cpFetch(`/v1/clients/${clientId}/qb/company`)
-            .then(async (r) => { if (!cancelled && r.ok) setCompany(await r.json()); })
+            .then(async (r) => { if (!signal?.cancelled && r.ok) setCompany(await r.json()); })
             .catch(() => {})
         );
         promises.push(
           cpFetch(`/v1/clients/${clientId}/qb/vendors`)
-            .then(async (r) => { if (!cancelled && r.ok) setVendors(await r.json()); })
+            .then(async (r) => { if (!signal?.cancelled && r.ok) setVendors(await r.json()); })
             .catch(() => {})
         );
       }
 
-      // Fetch escalations for this client from Observatory API
       promises.push(
         apiFetch(`/v1/escalations?client_id=${clientId}&limit=10`)
-          .then(async (r) => { if (!cancelled && r.ok) setEscalations(await r.json()); })
+          .then(async (r) => { if (!signal?.cancelled && r.ok) setEscalations(await r.json()); })
           .catch(() => {})
       );
 
       await Promise.all(promises);
     } catch (e) {
-      if (!cancelled) setError(e instanceof Error ? e.message : 'Network error');
+      if (!signal?.cancelled) setError(e instanceof Error ? e.message : 'Network error');
     }
-    if (!cancelled) setLoading(false);
-
-    // Return cleanup for useEffect
-    return () => { cancelled = true; };
+    if (!signal?.cancelled) setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
-    fetchAll();
+    const signal = { cancelled: false };
+    fetchAll(signal);
+    return () => { signal.cancelled = true; };
   }, [fetchAll]);
 
   const assignAgent = useCallback(async (

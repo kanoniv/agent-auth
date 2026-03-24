@@ -53,25 +53,14 @@ export const ConnectPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [cpApiUrl, jwt, success, returnedClientId, clientParam]);
 
-  const handleConnect = async () => {
-    if (!clientId) return;
+  const handleConnect = () => {
+    if (!clientId || !jwt) return;
     setLoading(true);
-    setError(null);
-    try {
-      // Fetch the Intuit redirect URL via the API (sends JWT for auth)
-      const resp = await fetch(`${cpApiUrl}/v1/oauth/quickbooks/connect/${clientId}`, {
-        headers: { 'Authorization': `Bearer ${jwt}` },
-        redirect: 'manual', // Don't follow redirect - capture the URL
-      });
-      // The API returns 307 with Location header, but fetch with redirect:manual
-      // gives us an opaque redirect response. Use redirect:follow instead and
-      // let the browser handle it by opening in same window.
-      // Simpler approach: just pass the JWT as a query param for this one endpoint.
-      window.location.href = `${cpApiUrl}/v1/oauth/quickbooks/connect/${clientId}?token=${jwt}`;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start OAuth flow');
-      setLoading(false);
-    }
+    // Redirect browser to CP API OAuth endpoint with JWT in query param.
+    // NOTE: JWT in URL is a security tradeoff - visible in browser history and
+    // server logs. A short-lived nonce exchange would be better but requires
+    // an additional endpoint. Acceptable for now since the JWT has limited scope.
+    window.location.href = `${cpApiUrl}/v1/oauth/quickbooks/connect/${clientId}?token=${jwt}`;
   };
 
   if (success) {
