@@ -6,6 +6,7 @@ import { Shield, Users, Link2, Activity, Rocket, UserPlus, GitBranch, BarChart3,
 import { useAgents } from '@/hooks/useAgents';
 import { useDelegations } from '@/hooks/useDelegations';
 import { useProvenance } from '@/hooks/useProvenance';
+import { useClients } from '@/hooks/useClients';
 import { StatCard } from '@/components/StatCard';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { AgentCard } from '@/components/AgentCard';
@@ -267,6 +268,8 @@ export const DashboardPage: React.FC = () => {
   const { agents, loading, refetch: refetchAgents } = useAgents();
   const { delegations, refetch: refetchDelegations } = useDelegations();
   const { provenance, refetch: refetchProvenance } = useProvenance();
+  const { clients } = useClients();
+  const [selectedClient, setSelectedClient] = useState<string>('all');
 
   const activeDelegations = delegations.filter(d => !d.revoked_at && (!d.expires_at || new Date(d.expires_at) > new Date()));
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -309,6 +312,18 @@ export const DashboardPage: React.FC = () => {
         <span className="text-[10px] text-[#6B6760] bg-[#F7F6F3] px-2 py-0.5 rounded-full">
           {agents.length} agent{agents.length !== 1 ? 's' : ''}
         </span>
+        {clients.length > 0 && (
+          <select
+            value={selectedClient}
+            onChange={e => setSelectedClient(e.target.value)}
+            className="ml-auto bg-white border border-[#E8E5DE] text-[#6B6760] text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#B08D3E] transition-colors"
+          >
+            <option value="all">All Clients</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
       </motion.div>
 
       {/* Stats */}

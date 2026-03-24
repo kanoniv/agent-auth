@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Check, X, Clock, DollarSign, Building2, Shield, ChevronDown, CheckCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
+import { useClients } from '../hooks/useClients';
 
 const stagger = {
   hidden: {},
@@ -27,6 +29,7 @@ interface Escalation {
   approved_by: string | null;
   denial_reason: string | null;
   approval_token: string | null;
+  client_id: string | null;
   created_at: string;
   expires_at: string;
   resolved_at: string | null;
@@ -81,20 +84,28 @@ function timeUntilExpiry(expiresAt: string): string {
 }
 
 export const EscalationsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const { clients } = useClients();
+  const clientMap = new Map(clients.map(c => [c.id, c.name]));
+
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [clientFilter, setClientFilter] = useState<string>(searchParams.get('client_id') || 'all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
 
   const fetchEscalations = useCallback(async () => {
     try {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      const resp = await apiFetch(`/v1/escalations${params}`);
+      const qp = new URLSearchParams();
+      if (filter !== 'all') qp.set('status', filter);
+      if (clientFilter !== 'all') qp.set('client_id', clientFilter);
+      const qs = qp.toString();
+      const resp = await apiFetch(`/v1/escalations${qs ? `?${qs}` : ''}`);
       if (resp.ok) setEscalations(await resp.json());
     } catch { /* degrade silently */ }
     setLoading(false);
-  }, [filter]);
+  }, [filter, clientFilter]);
 
   useEffect(() => {
     fetchEscalations();
@@ -139,20 +150,37 @@ export const EscalationsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex gap-1.5">
-          {['all', 'pending', 'approved', 'denied', 'expired'].map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                filter === f
-                  ? 'bg-[#FAF6ED] text-[#B08D3E] border border-[#E8DCC4]'
-                  : 'bg-white border border-[#E8E5DE] text-[#6B6760] hover:bg-[#F7F6F3]'
-              }`}
+        <div className="flex items-center gap-3">
+          {/* Client filter */}
+          {clients.length > 0 && (
+            <select
+              value={clientFilter}
+              onChange={e => setClientFilter(e.target.value)}
+              className="bg-white border border-[#E8E5DE] text-[#6B6760] text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#B08D3E] transition-colors"
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+              <option value="all">All Clients</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Status filters */}
+          <div className="flex gap-1.5">
+            {['all', 'pending', 'approved', 'denied', 'expired'].map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                  filter === f
+                    ? 'bg-[#FAF6ED] text-[#B08D3E] border border-[#E8DCC4]'
+                    : 'bg-white border border-[#E8E5DE] text-[#6B6760] hover:bg-[#F7F6F3]'
+                }`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
@@ -199,7 +227,15 @@ export const EscalationsPage: React.FC = () => {
                           )}
                           {confidenceBadge(esc.vendor_confidence)}
                         </div>
-                        <p className="text-xs text-[#6B6760] mt-0.5 truncate">{esc.agent_name} - {esc.reason}</p>
+                        <p className="text-xs text-[#6B6760] mt-0.5 truncate">
+                          {esc.agent_name}
+                          {esc.client_id && clientMap.get(esc.client_id) && (
+                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-[#F7F6F3] text-[#9C978E] border border-[#F0EDE6]">
+                              {clientMap.get(esc.client_id)}
+                            </span>
+                          )}
+                          <span className="mx-1 text-[#E8E5DE]">-</span>{esc.reason}
+                        </p>
                       </div>
                     </div>
 
