@@ -904,6 +904,25 @@ app.get('/v1/escalations', async (req, res) => {
   }
 });
 
+// Escalation stats for dashboard (MUST be before :id route)
+app.get('/v1/escalations/stats', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'approved') as approved,
+        COUNT(*) FILTER (WHERE status = 'denied') as denied,
+        COUNT(*) FILTER (WHERE status = 'expired') as expired,
+        COUNT(*) as total
+      FROM escalations
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+    `);
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get single escalation
 app.get('/v1/escalations/:id', async (req, res) => {
   try {
@@ -1031,25 +1050,6 @@ app.get('/v1/spend/summary', async (req, res) => {
       agents,
       total_spend: agents.reduce((sum, a) => sum + a.daily_spend, 0),
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Escalation stats for dashboard
-app.get('/v1/escalations/stats', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE status = 'pending') as pending,
-        COUNT(*) FILTER (WHERE status = 'approved') as approved,
-        COUNT(*) FILTER (WHERE status = 'denied') as denied,
-        COUNT(*) FILTER (WHERE status = 'expired') as expired,
-        COUNT(*) as total
-      FROM escalations
-      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-    `);
-    res.json(result.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
