@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Building2, Check, Clock, Users, AlertTriangle, DollarSign,
-  RefreshCw, Plus, X, Link2, ChevronDown, Shield,
+  RefreshCw, Plus, X, Link2, Shield,
 } from 'lucide-react';
 import { useClientDetail, type ClientAgent, type QbVendor, type Escalation } from '../hooks/useClientDetail';
 import { DELEGATION_TEMPLATES } from '../lib/constants';
@@ -36,6 +36,7 @@ export const ClientDetailPage: React.FC = () => {
   const [assignName, setAssignName] = useState('');
   const [assignTemplate, setAssignTemplate] = useState(1); // AP Clerk default
   const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [unassigningAgent, setUnassigningAgent] = useState<string | null>(null);
 
@@ -67,10 +68,15 @@ export const ClientDetailPage: React.FC = () => {
   const handleAssign = async () => {
     if (!assignName.trim()) return;
     setAssigning(true);
-    await assignAgent(assignName.trim(), [...template.scopes], 4);
+    setAssignError(null);
+    const result = await assignAgent(assignName.trim(), [...template.scopes], 4);
     setAssigning(false);
-    setShowAssign(false);
-    setAssignName('');
+    if (result.ok) {
+      setShowAssign(false);
+      setAssignName('');
+    } else {
+      setAssignError(result.error || 'Failed to assign agent');
+    }
   };
 
   const handleUnassign = async (agentName: string) => {
@@ -227,6 +233,9 @@ export const ClientDetailPage: React.FC = () => {
                 </div>
                 <p className="text-[9px] text-[#9C978E] mt-1">{template.description}{template.maxCost ? ` - up to $${template.maxCost.toLocaleString()}` : ''}</p>
               </div>
+              {assignError && (
+                <p className="text-xs text-[#C23A3A] bg-[#FDF0F0] border border-[#F0C6C6] rounded-md px-3 py-2">{assignError}</p>
+              )}
               <button
                 onClick={handleAssign}
                 disabled={!assignName.trim() || assigning}

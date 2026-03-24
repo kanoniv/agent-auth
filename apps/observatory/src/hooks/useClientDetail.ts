@@ -74,18 +74,21 @@ export function useClientDetail(clientId: string | undefined) {
 
   const fetchAll = useCallback(async () => {
     if (!clientId) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
 
     try {
       // Fetch client detail from CP API
       const clientResp = await cpFetch(`/v1/clients/${clientId}`);
+      if (cancelled) return;
       if (!clientResp.ok) {
         setError(`Failed to load client (${clientResp.status})`);
         setLoading(false);
         return;
       }
       const clientData: ClientDetail = await clientResp.json();
+      if (cancelled) return;
       setClient(clientData);
 
       // Fetch QB data if connected (parallel, best-effort)
@@ -94,12 +97,12 @@ export function useClientDetail(clientId: string | undefined) {
       if (clientData.quickbooks_connected) {
         promises.push(
           cpFetch(`/v1/clients/${clientId}/qb/company`)
-            .then(async (r) => { if (r.ok) setCompany(await r.json()); })
+            .then(async (r) => { if (!cancelled && r.ok) setCompany(await r.json()); })
             .catch(() => {})
         );
         promises.push(
           cpFetch(`/v1/clients/${clientId}/qb/vendors`)
-            .then(async (r) => { if (r.ok) setVendors(await r.json()); })
+            .then(async (r) => { if (!cancelled && r.ok) setVendors(await r.json()); })
             .catch(() => {})
         );
       }
@@ -107,15 +110,18 @@ export function useClientDetail(clientId: string | undefined) {
       // Fetch escalations for this client from Observatory API
       promises.push(
         apiFetch(`/v1/escalations?client_id=${clientId}&limit=10`)
-          .then(async (r) => { if (r.ok) setEscalations(await r.json()); })
+          .then(async (r) => { if (!cancelled && r.ok) setEscalations(await r.json()); })
           .catch(() => {})
       );
 
       await Promise.all(promises);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error');
+      if (!cancelled) setError(e instanceof Error ? e.message : 'Network error');
     }
-    setLoading(false);
+    if (!cancelled) setLoading(false);
+
+    // Return cleanup for useEffect
+    return () => { cancelled = true; };
   }, [clientId]);
 
   useEffect(() => {
