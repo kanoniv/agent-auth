@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, Check, X, Clock, DollarSign, Building2, Shield, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Check, X, Clock, DollarSign, Building2, Shield, ChevronDown, CheckCircle } from 'lucide-react';
 import { apiFetch } from '../lib/api';
-import { GOLD } from '../lib/constants';
+
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const } },
+};
 
 interface Escalation {
   id: string;
@@ -23,19 +32,30 @@ interface Escalation {
   resolved_at: string | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  approved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  denied: 'bg-red-500/10 text-red-400 border-red-500/20',
-  expired: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+const STATUS_BADGE: Record<string, string> = {
+  pending: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+  approved: 'bg-green-500/15 text-green-400 border-green-500/20',
+  denied: 'bg-red-500/15 text-red-400 border-red-500/20',
+  expired: 'bg-white/[.05] text-[#55555F] border-white/[.07]',
+};
+
+const ACCENT_BORDER: Record<string, string> = {
+  pending: 'border-l-amber-400',
+  approved: 'border-l-[#34D399]',
+  denied: 'border-l-[#F87171]',
+  expired: 'border-l-[#55555F]',
 };
 
 function confidenceBadge(confidence: number | null) {
   if (confidence === null) return null;
   const pct = (confidence * 100).toFixed(0);
-  const color = confidence >= 0.85 ? 'text-emerald-400' : confidence >= 0.5 ? 'text-amber-400' : 'text-red-400';
+  const style = confidence >= 0.85
+    ? 'bg-green-500/15 text-green-400 border-green-500/20'
+    : confidence >= 0.5
+    ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+    : 'bg-red-500/15 text-red-400 border-red-500/20';
   return (
-    <span className={`text-xs font-mono ${color}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${style}`}>
       {pct}% match
     </span>
   );
@@ -56,8 +76,8 @@ function timeUntilExpiry(expiresAt: string): string {
   if (diff <= 0) return 'expired';
   const hrs = Math.floor(diff / 3600000);
   const mins = Math.floor((diff % 3600000) / 60000);
-  if (hrs > 0) return `${hrs}h ${mins}m left`;
-  return `${mins}m left`;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  return `${mins}m`;
 }
 
 export const EscalationsPage: React.FC = () => {
@@ -71,11 +91,8 @@ export const EscalationsPage: React.FC = () => {
     try {
       const params = filter !== 'all' ? `?status=${filter}` : '';
       const resp = await apiFetch(`/v1/escalations${params}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        setEscalations(data);
-      }
-    } catch { /* ignore */ }
+      if (resp.ok) setEscalations(await resp.json());
+    } catch { /* degrade silently */ }
     setLoading(false);
   }, [filter]);
 
@@ -89,215 +106,190 @@ export const EscalationsPage: React.FC = () => {
     setActing(id);
     try {
       const resp = await apiFetch(`/v1/escalations/${id}/approve`, { method: 'POST' });
-      if (resp.ok) {
-        fetchEscalations();
-      }
-    } catch { /* ignore */ }
+      if (resp.ok) fetchEscalations();
+    } catch { /* */ }
     setActing(null);
   };
 
   const handleDeny = async (id: string) => {
     setActing(id);
     try {
-      const resp = await apiFetch(`/v1/escalations/${id}/deny`, {
+      await apiFetch(`/v1/escalations/${id}/deny`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Denied by reviewer' }),
       });
-      if (resp.ok) {
-        fetchEscalations();
-      }
-    } catch { /* ignore */ }
+      fetchEscalations();
+    } catch { /* */ }
     setActing(null);
   };
 
   const pendingCount = escalations.filter(e => e.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
+    <motion.div className="p-6 max-w-5xl mx-auto" initial="hidden" animate="show" variants={stagger}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex items-end justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-[#E8E8ED]">Escalations</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {pendingCount > 0 ? `${pendingCount} pending approval` : 'No pending escalations'}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Authorization</p>
+          <h1 className="text-2xl font-bold text-[#E8E8ED]">Escalations</h1>
+          <p className="text-xs text-[#8B8B96] mt-1">
+            {pendingCount > 0
+              ? `${pendingCount} pending approval${pendingCount > 1 ? 's' : ''}`
+              : 'No pending escalations'}
           </p>
         </div>
 
-        {/* Filter */}
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {['all', 'pending', 'approved', 'denied', 'expired'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
                 filter === f
-                  ? 'border-[#C5A572]/50 bg-[#C5A572]/10 text-[#C5A572]'
-                  : 'border-white/[.07] text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-[#C5A572]/10 text-[#C5A572] border border-[#C5A572]/20'
+                  : 'bg-white/[.02] border border-white/[.07] text-[#8B8B96] hover:text-[#E8E8ED] hover:bg-white/[.05]'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      {/* Escalation List */}
+      {/* List */}
       {loading ? (
-        <div className="text-zinc-500 text-sm">Loading...</div>
-      ) : escalations.length === 0 ? (
-        <div className="rounded-xl bg-[#12121a] border border-white/[.07] p-12 text-center">
-          <AlertTriangle className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-          <p className="text-zinc-500">No escalations found</p>
-          <p className="text-zinc-600 text-xs mt-1">
-            Escalations appear when agents hit delegation limits
-          </p>
-        </div>
-      ) : (
         <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-20 rounded-xl bg-[#12121a] border border-white/[.07] animate-pulse" />
+          ))}
+        </div>
+      ) : escalations.length === 0 ? (
+        <motion.div variants={fadeUp} className="flex flex-col items-center gap-3 text-center py-16">
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}>
+            <CheckCircle className="w-10 h-10 text-[#34D399]" />
+          </motion.div>
+          <p className="text-sm font-medium text-[#E8E8ED]">All clear</p>
+          <p className="text-xs text-[#55555F]">Escalations appear when agents exceed delegation limits</p>
+        </motion.div>
+      ) : (
+        <motion.div variants={stagger} className="space-y-3">
           <AnimatePresence>
-            {escalations.map((esc, i) => (
+            {escalations.map(esc => (
               <motion.div
                 key={esc.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={`rounded-xl bg-[#12121a] border border-white/[.07] overflow-hidden ${
-                  esc.status === 'pending' ? 'border-amber-500/20' : ''
-                }`}
+                variants={fadeUp}
+                className={`bg-[#12121a] border border-white/[.07] border-l-2 ${ACCENT_BORDER[esc.status]} rounded-lg overflow-hidden`}
               >
                 {/* Card Header */}
                 <div
-                  className="p-4 cursor-pointer hover:bg-white/[.02] transition-colors"
+                  className="px-5 py-4 cursor-pointer hover:bg-white/[.02] transition-colors"
                   onClick={() => setExpandedId(expandedId === esc.id ? null : esc.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${
-                        esc.status === 'pending' ? 'bg-amber-400 animate-pulse' :
-                        esc.status === 'approved' ? 'bg-emerald-400' :
-                        esc.status === 'denied' ? 'bg-red-400' : 'bg-zinc-600'
-                      }`} />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-[#E8E8ED]">
+                          <span className="text-sm font-medium text-[#E8E8ED] truncate">
                             {esc.vendor || 'Unknown vendor'}
                           </span>
-                          {esc.amount && (
-                            <span className="text-sm font-mono" style={{ color: GOLD }}>
+                          {esc.amount != null && (
+                            <span className="text-sm font-bold tabular-nums text-[#C5A572]">
                               ${esc.amount.toLocaleString()}
                             </span>
                           )}
                           {confidenceBadge(esc.vendor_confidence)}
                         </div>
-                        <div className="text-xs text-zinc-500 mt-0.5">
-                          {esc.agent_name} - {esc.reason}
-                        </div>
+                        <p className="text-xs text-[#55555F] mt-0.5 truncate">{esc.agent_name} - {esc.reason}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 text-xs rounded-md border ${STATUS_STYLES[esc.status]}`}>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${STATUS_BADGE[esc.status]}`}>
                         {esc.status}
                       </span>
                       {esc.status === 'pending' && (
-                        <span className="text-xs text-zinc-500 flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] text-[#8B8B96] tabular-nums">
                           <Clock className="w-3 h-3" />
                           {timeUntilExpiry(esc.expires_at)}
                         </span>
                       )}
-                      <span className="text-xs text-zinc-600">{timeAgo(esc.created_at)}</span>
-                      <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${
+                      <span className="text-[10px] text-[#55555F] tabular-nums">{timeAgo(esc.created_at)}</span>
+                      <ChevronDown className={`w-4 h-4 text-[#55555F] transition-transform duration-200 ${
                         expandedId === esc.id ? 'rotate-180' : ''
                       }`} />
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded Details */}
+                {/* Expanded */}
                 {expandedId === esc.id && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                     className="border-t border-white/[.07]"
                   >
-                    <div className="p-4 space-y-3">
-                      {/* Detail Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="space-y-1">
-                          <div className="text-xs text-zinc-500 flex items-center gap-1">
-                            <Shield className="w-3 h-3" /> Agent
+                    <div className="px-5 py-4 space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Agent', icon: Shield, value: esc.agent_name, sub: esc.agent_did },
+                          { label: 'Amount', icon: DollarSign, value: esc.amount ? `$${esc.amount.toLocaleString()}` : 'N/A', sub: null },
+                          { label: 'Vendor', icon: Building2, value: esc.vendor || 'Unknown', sub: null },
+                          { label: 'Action', icon: Shield, value: esc.action, sub: null },
+                        ].map(({ label, icon: Icon, value, sub }) => (
+                          <div key={label}>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] flex items-center gap-1 mb-1">
+                              <Icon className="w-3 h-3" /> {label}
+                            </p>
+                            <p className={`text-sm text-[#E8E8ED] ${label === 'Amount' ? 'font-bold tabular-nums text-[#C5A572]' : ''} ${label === 'Action' ? 'font-mono text-xs' : ''}`}>
+                              {value}
+                            </p>
+                            {sub && <p className="text-[10px] text-[#55555F] font-mono truncate mt-0.5">{sub}</p>}
                           </div>
-                          <div className="text-sm text-[#E8E8ED]">{esc.agent_name}</div>
-                          <div className="text-xs text-zinc-600 font-mono truncate">{esc.agent_did}</div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-zinc-500 flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" /> Amount
-                          </div>
-                          <div className="text-sm font-mono" style={{ color: GOLD }}>
-                            {esc.amount ? `$${esc.amount.toLocaleString()}` : 'N/A'}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-zinc-500 flex items-center gap-1">
-                            <Building2 className="w-3 h-3" /> Vendor
-                          </div>
-                          <div className="text-sm text-[#E8E8ED]">{esc.vendor || 'Unknown'}</div>
-                          {confidenceBadge(esc.vendor_confidence)}
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-zinc-500">Action</div>
-                          <div className="text-sm text-[#E8E8ED] font-mono text-xs">{esc.action}</div>
-                        </div>
+                        ))}
                       </div>
 
-                      {/* Reason */}
-                      <div className="rounded-lg bg-[#0a0a0f] p-3">
-                        <div className="text-xs text-zinc-500 mb-1">Reason</div>
-                        <div className="text-sm text-amber-400">{esc.reason}</div>
+                      <div className="bg-[#0a0a0f] rounded-lg p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Reason</p>
+                        <p className="text-sm text-amber-400">{esc.reason}</p>
                       </div>
 
-                      {/* Invoice Data */}
                       {esc.invoice_data && (
-                        <div className="rounded-lg bg-[#0a0a0f] p-3">
-                          <div className="text-xs text-zinc-500 mb-1">Invoice Data</div>
-                          <pre className="text-xs text-zinc-400 font-mono overflow-x-auto">
+                        <div className="bg-[#0a0a0f] rounded-lg p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Invoice</p>
+                          <pre className="text-xs text-[#8B8B96] font-mono overflow-x-auto">
                             {JSON.stringify(esc.invoice_data, null, 2)}
                           </pre>
                         </div>
                       )}
 
-                      {/* Resolution Info */}
                       {esc.status !== 'pending' && (
-                        <div className="rounded-lg bg-[#0a0a0f] p-3">
-                          <div className="text-xs text-zinc-500 mb-1">Resolution</div>
-                          <div className="text-sm text-[#E8E8ED]">
+                        <div className="bg-[#0a0a0f] rounded-lg p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Resolution</p>
+                          <p className="text-sm text-[#E8E8ED]">
                             {esc.status === 'approved' && `Approved by ${esc.approved_by}`}
-                            {esc.status === 'denied' && `Denied by ${esc.approved_by}: ${esc.denial_reason}`}
+                            {esc.status === 'denied' && `Denied: ${esc.denial_reason}`}
                             {esc.status === 'expired' && 'Expired without action'}
-                          </div>
+                          </p>
                         </div>
                       )}
 
-                      {/* Action Buttons */}
                       {esc.status === 'pending' && (
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2 pt-1">
                           <button
                             onClick={() => handleApprove(esc.id)}
                             disabled={acting === esc.id}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                            className="bg-[#34D399] hover:bg-[#34D399]/80 text-[#0a0a0f] font-bold text-sm rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
                           >
-                            <Check className="w-4 h-4" />
-                            Approve
+                            <Check className="w-4 h-4" /> Approve
                           </button>
                           <button
                             onClick={() => handleDeny(esc.id)}
                             disabled={acting === esc.id}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                            className="border border-[#F87171]/20 bg-[#F87171]/10 text-[#F87171] hover:bg-[#F87171]/20 text-sm font-medium rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
                           >
-                            <X className="w-4 h-4" />
-                            Deny
+                            <X className="w-4 h-4" /> Deny
                           </button>
                         </div>
                       )}
@@ -307,8 +299,8 @@ export const EscalationsPage: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
