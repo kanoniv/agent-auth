@@ -85,10 +85,16 @@ export const ClientDetailPage: React.FC = () => {
     setUnassigningAgent(null);
   };
 
+  const [syncError, setSyncError] = useState<string | null>(null);
+
   const handleSync = async () => {
     setSyncing(true);
-    await triggerImport();
+    setSyncError(null);
+    const result = await triggerImport();
     setSyncing(false);
+    if (!result.ok) {
+      setSyncError(result.error || 'Sync failed');
+    }
   };
 
   return (
@@ -135,6 +141,13 @@ export const ClientDetailPage: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Sync error */}
+      {syncError && (
+        <motion.div variants={fadeUp} className="bg-[#FDF0F0] border border-[#F0C6C6] text-[#C23A3A] rounded-lg p-3 mb-4 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {syncError}
+        </motion.div>
+      )}
 
       {/* QB Company Info */}
       {company && (
