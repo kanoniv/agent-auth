@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Building2, Plus, ArrowRight, Check, Trash2, Users, Clock, AlertTriangle, Link2 } from 'lucide-react';
 import { useClients, type Client } from '../hooks/useClients';
 
@@ -84,15 +84,14 @@ export const ClientsPage: React.FC = () => {
       </motion.div>
 
       {/* Add Client Form */}
-      <AnimatePresence>
-        {showAdd && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden mb-6"
-          >
-            <motion.div variants={fadeUp} className="bg-white border border-[#E8DCC4] rounded-lg p-5 shadow-[0_2px_8px_rgba(26,24,20,0.06)]">
+      {showAdd && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-6"
+        >
+          <div className="bg-white border border-[#E8DCC4] rounded-lg p-5 shadow-[0_2px_8px_rgba(26,24,20,0.06)]">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 className="w-4 h-4 text-[#B08D3E]" />
                 <span className="text-xs font-semibold text-[#1A1814]">Add a Client Firm</span>
@@ -146,10 +145,9 @@ export const ClientsPage: React.FC = () => {
                   or <button onClick={() => navigate('/connect')} className="text-[#B08D3E] hover:text-[#C5A572] ml-1 font-medium transition-colors">connect QuickBooks</button> to auto-import
                 </span>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </motion.div>
+      )}
 
       {/* Error state */}
       {error && !loading && (
