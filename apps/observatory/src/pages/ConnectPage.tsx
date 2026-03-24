@@ -24,11 +24,17 @@ export const ConnectPage: React.FC = () => {
 
   const success = searchParams.get('success') === 'true';
   const returnedClientId = searchParams.get('client_id');
+  const clientParam = searchParams.get('client');
 
   // Fetch or create client on mount
   useEffect(() => {
+    // Use client_id from success callback, or client param from navigation, or fetch first client
     if (success && returnedClientId) {
       setClientId(returnedClientId);
+      return;
+    }
+    if (clientParam) {
+      setClientId(clientParam);
       return;
     }
     let cancelled = false;
@@ -40,23 +46,12 @@ export const ConnectPage: React.FC = () => {
         if (!resp.ok) return;
         const data = await resp.json();
         if (data.clients?.length > 0) {
-          setClientId(data.clients[0].id);
-        } else {
-          // Auto-create first client
-          const createResp = await fetch(`${cpApiUrl}/v1/clients`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'My Firm' }),
-          });
-          if (createResp.ok) {
-            const client = await createResp.json();
-            if (!cancelled) setClientId(client.id);
-          }
+          if (!cancelled) setClientId(data.clients[0].id);
         }
       } catch { /* */ }
     })();
     return () => { cancelled = true; };
-  }, [cpApiUrl, jwt, success, returnedClientId]);
+  }, [cpApiUrl, jwt, success, returnedClientId, clientParam]);
 
   const handleConnect = () => {
     if (!clientId) return;
@@ -86,12 +81,20 @@ export const ConnectPage: React.FC = () => {
             </motion.div>
             <h1 className="text-xl font-display font-bold text-[#1A1814] mb-2">QuickBooks Connected</h1>
             <p className="text-sm text-[#6B6760] mb-6">Your accounting data is now accessible to authorized agents</p>
-            <button
-              onClick={() => navigate('/agents/new')}
-              className="bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-6 py-3 transition-colors"
-            >
-              Create Your First Agent
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => navigate(returnedClientId ? `/clients/${returnedClientId}` : '/clients')}
+                className="bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-6 py-3 transition-colors"
+              >
+                View Client Details
+              </button>
+              <button
+                onClick={() => navigate(`/agents/new${returnedClientId ? `?client_id=${returnedClientId}` : ''}`)}
+                className="text-sm text-[#B08D3E] hover:text-[#C5A572] font-medium transition-colors"
+              >
+                Assign an agent to this client
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

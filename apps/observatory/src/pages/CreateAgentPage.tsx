@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Copy, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Shield, Copy, CheckCircle, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { DELEGATION_TEMPLATES } from '../lib/constants';
+import { cpFetch } from '../lib/cpApi';
+import { apiFetch } from '../lib/api';
 
 const stagger = {
   hidden: {},
@@ -16,33 +18,78 @@ const fadeUp = {
 
 export const CreateAgentPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const clientId = searchParams.get('client_id');
   const [name, setName] = useState('');
   const [templateIdx, setTemplateIdx] = useState(1); // AP Clerk default
   const [token, setToken] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const template = DELEGATION_TEMPLATES[templateIdx];
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim()) { setError('Agent name is required'); return; }
     setError(null);
+    setCreating(true);
 
-    // Generate delegation token from template
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const agentDid = `did:key:z6Mk_${name.toLowerCase().replace(/\s+/g, '_')}`;
+    try {
+      // Step 1: Register agent in Observatory
+      const regResp = await apiFetch('/v1/agents/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          description: template.description,
+          capabilities: [...template.scopes],
+        }),
+      });
 
-    const payload = {
-      agent_did: agentDid,
-      agent_name: name.trim(),
-      scopes: [...template.scopes],
-      max_cost: template.maxCost,
-      daily_limit: template.maxCost ? template.maxCost * 5 : 0,
-      expires_at: expiresAt,
-    };
+      if (!regResp.ok) {
+        const data = await regResp.json().catch(() => ({}));
+        // 409 = already exists, which is fine - continue to assign
+        if (regResp.status !== 409) {
+          setError(data.error || `Failed to register agent (${regResp.status})`);
+          setCreating(false);
+          return;
+        }
+      }
 
-    const tokenB64 = btoa(JSON.stringify(payload));
-    setToken(tokenB64);
+      // Step 2: If we have a client_id, assign agent to client via CP API
+      if (clientId) {
+        const assignResp = await cpFetch(`/v1/agents/${name.trim()}/assign`, {
+          method: 'POST',
+          body: JSON.stringify({
+            client_id: clientId,
+            scopes: [...template.scopes],
+            ttl_hours: 720, // 30 days
+          }),
+        });
+
+        if (assignResp.ok) {
+          const assignData = await assignResp.json();
+          if (assignData.delegation_token) {
+            setToken(assignData.delegation_token);
+            setCreating(false);
+            return;
+          }
+        }
+      }
+
+      // Step 3: Generate token (base64 payload as fallback if no CP assign)
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const payload = {
+        agent_name: name.trim(),
+        scopes: [...template.scopes],
+        max_cost: template.maxCost,
+        daily_limit: template.maxCost ? template.maxCost * 5 : 0,
+        expires_at: expiresAt,
+      };
+      setToken(btoa(JSON.stringify(payload)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error');
+    }
+    setCreating(false);
   };
 
   const handleCopy = async () => {
@@ -233,9 +280,11 @@ export const CreateAgentPage: React.FC = () => {
 
         <button
           onClick={handleCreate}
-          className="w-full bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-4 py-3 transition-colors flex items-center justify-center gap-2"
+          disabled={creating || !name.trim()}
+          className="w-full bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-4 py-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          <Shield className="w-4 h-4" /> Create Agent & Generate Token
+          {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+          {creating ? 'Creating...' : 'Create Agent & Generate Token'}
         </button>
       </motion.div>
     </motion.div>

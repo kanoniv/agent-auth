@@ -166,8 +166,8 @@ export const ClientsPage: React.FC = () => {
             <div key={i} className="h-20 rounded-lg bg-white border border-[#E8E5DE] animate-pulse" />
           ))}
         </div>
-      ) : isEmpty ? (
-        /* Empty state */
+      ) : isEmpty && !showAdd ? (
+        /* Empty state - only show when form is NOT open */
         <motion.div variants={fadeUp} className="flex flex-col items-center justify-center py-16">
           <motion.div
             initial={{ scale: 0 }}
@@ -196,6 +196,8 @@ export const ClientsPage: React.FC = () => {
             </button>
           </div>
         </motion.div>
+      ) : clients.length === 0 && showAdd ? (
+        null /* Form is visible above, no list to show */
       ) : (
         /* Client list */
         <motion.div variants={stagger} className="space-y-3">
