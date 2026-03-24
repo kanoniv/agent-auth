@@ -7,6 +7,7 @@ import { AgentDetailPage } from './pages/AgentDetailPage';
 import { EscalationsPage } from './pages/EscalationsPage';
 import { AuditPage } from './pages/AuditPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { ClientDetailPage } from './pages/ClientDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
@@ -31,6 +32,7 @@ export const App: React.FC = () => (
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/clients/:id" element={<ClientDetailPage />} />
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/agents/:name" element={<AgentDetailPage />} />
         <Route path="/agents/new" element={<CreateAgentPage />} />

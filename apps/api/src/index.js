@@ -852,14 +852,14 @@ app.delete('/v1/chat/conversations/:id', async (req, res) => {
 
 // Create escalation request (from AP agent when denied)
 app.post('/v1/escalations', async (req, res) => {
-  const { agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data } = req.body;
+  const { agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data, client_id } = req.body;
   if (!agent_did || !reason) return res.status(400).json({ error: 'agent_did and reason required' });
 
   try {
     const result = await pool.query(
-      `INSERT INTO escalations (agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [agent_did, agent_name || 'unknown', action, amount, vendor, vendor_confidence, reason, invoice_data ? JSON.stringify(invoice_data) : null]
+      `INSERT INTO escalations (agent_did, agent_name, action, amount, vendor, vendor_confidence, reason, invoice_data, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [agent_did, agent_name || 'unknown', action, amount, vendor, vendor_confidence, reason, invoice_data ? JSON.stringify(invoice_data) : null, client_id || null]
     );
     await recordProvenance(agentName(req), 'escalation.created', [], { escalation_id: result.rows[0].id, reason, amount }, agent_did);
     res.status(201).json(result.rows[0]);
@@ -868,9 +868,9 @@ app.post('/v1/escalations', async (req, res) => {
   }
 });
 
-// List escalations (filter by status)
+// List escalations (filter by status, agent, or client)
 app.get('/v1/escalations', async (req, res) => {
-  const { status, agent_did, limit = 50 } = req.query;
+  const { status, agent_did, client_id, limit = 50 } = req.query;
   try {
     let query = 'SELECT * FROM escalations';
     const params = [];
@@ -883,6 +883,10 @@ app.get('/v1/escalations', async (req, res) => {
     if (agent_did) {
       params.push(agent_did);
       conditions.push(`agent_did = $${params.length}`);
+    }
+    if (client_id) {
+      params.push(client_id);
+      conditions.push(`client_id = $${params.length}`);
     }
 
     if (conditions.length > 0) {
@@ -906,8 +910,9 @@ app.get('/v1/escalations', async (req, res) => {
 
 // Escalation stats for dashboard (MUST be before :id route)
 app.get('/v1/escalations/stats', async (req, res) => {
+  const { client_id } = req.query;
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT
         COUNT(*) FILTER (WHERE status = 'pending') as pending,
         COUNT(*) FILTER (WHERE status = 'approved') as approved,
@@ -915,8 +920,13 @@ app.get('/v1/escalations/stats', async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'expired') as expired,
         COUNT(*) as total
       FROM escalations
-      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-    `);
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+    const params = [];
+    if (client_id) {
+      params.push(client_id);
+      query += ` AND client_id = $${params.length}`;
+    }
+    const result = await pool.query(query, params);
     res.json(result.rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });

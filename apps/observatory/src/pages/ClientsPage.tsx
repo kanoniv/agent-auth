@@ -205,7 +205,8 @@ export const ClientsPage: React.FC = () => {
               client={client}
               deleting={deletingId === client.id}
               onDelete={() => handleDelete(client.id)}
-              onNavigate={() => navigate(`/connect?client=${client.id}`)}
+              onNavigate={() => navigate(`/clients/${client.id}`)}
+              onConnect={() => navigate(`/connect?client=${client.id}`)}
             />
           ))}
         </motion.div>
@@ -219,13 +220,14 @@ const ClientCard: React.FC<{
   deleting: boolean;
   onDelete: () => void;
   onNavigate: () => void;
-}> = ({ client, deleting, onDelete, onNavigate }) => {
+  onConnect: () => void;
+}> = ({ client, deleting, onDelete, onNavigate, onConnect }) => {
   return (
     <motion.div
       variants={fadeUp}
       className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] overflow-hidden"
     >
-      <div className="px-5 py-4 flex items-center justify-between">
+      <div className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-[#F7F6F3] transition-colors" onClick={onNavigate}>
         <div className="flex items-center gap-4 min-w-0">
           {/* Icon */}
           <div className="w-10 h-10 rounded-md bg-[#FAF6ED] border border-[#E8DCC4] flex items-center justify-center shrink-0">
@@ -269,14 +271,14 @@ const ClientCard: React.FC<{
         <div className="flex items-center gap-2 shrink-0 ml-4">
           {!client.quickbooks_connected && (
             <button
-              onClick={onNavigate}
+              onClick={(e) => { e.stopPropagation(); onConnect(); }}
               className="bg-[#FAF6ED] border border-[#E8DCC4] text-[#B08D3E] hover:bg-[#E8DCC4] text-xs font-medium rounded-md px-3 py-1.5 transition-colors flex items-center gap-1.5"
             >
               <Link2 className="w-3 h-3" /> Connect QB
             </button>
           )}
           <button
-            onClick={onDelete}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
             disabled={deleting}
             className="p-1.5 rounded-md text-[#9C978E] hover:text-[#C23A3A] hover:bg-[#FDF0F0] transition-colors disabled:opacity-50"
             title="Delete client"

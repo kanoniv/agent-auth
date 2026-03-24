@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-
-const JWT_KEY = 'kanoniv-jwt';
-const CP_API_URL = (typeof window !== 'undefined' && (window as any).__CP_API_URL) || 'https://control.kanoniv.com';
+import { cpFetch } from '../lib/cpApi';
 
 export interface Client {
   id: string;
@@ -21,18 +19,6 @@ interface PaginatedClients {
   total: number;
   page: number;
   per_page: number;
-}
-
-function cpFetch(path: string, opts: RequestInit = {}) {
-  const jwt = localStorage.getItem(JWT_KEY);
-  return fetch(`${CP_API_URL}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-      ...opts.headers,
-    },
-  });
 }
 
 export function useClients() {
