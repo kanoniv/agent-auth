@@ -9,8 +9,6 @@ import { useRecall } from '@/hooks/useRecall';
 import { useTrend } from '@/hooks/useTrend';
 import { ReputationBadge } from '@/components/ReputationBadge';
 import { DelegationCard } from '@/components/DelegationCard';
-import { LearningCurve } from '@/components/LearningCurve';
-import { RLLoopDiagram } from '@/components/RLLoopDiagram';
 import { cn, statusDot, statusColor, shortDid, timeAgo, shortId, scoreColor } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 
@@ -150,10 +148,10 @@ export const AgentDetailPage: React.FC = () => {
             </div>
           </div>
           <div className="mb-3">
-            <RLLoopDiagram trend={recallData.summary.recent_trend} />
+            <div className="text-xs text-[#6B6760] text-center py-4">Trend: {recallData.summary.recent_trend}</div>
           </div>
           {trendData && trendData.points.length > 1 && (
-            <LearningCurve points={trendData.points} height={160} />
+            <div className="text-xs text-[#9C978E] text-center py-6">{trendData.points.length} data points</div>
           )}
           <div className="grid grid-cols-3 gap-3 mt-4">
             {[

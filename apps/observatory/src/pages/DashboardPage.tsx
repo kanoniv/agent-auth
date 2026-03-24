@@ -7,7 +7,6 @@ import { useAgents } from '@/hooks/useAgents';
 import { useDelegations } from '@/hooks/useDelegations';
 import { useProvenance } from '@/hooks/useProvenance';
 import { StatCard } from '@/components/StatCard';
-import { TrustGraph } from '@/components/TrustGraph';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { AgentCard } from '@/components/AgentCard';
 import { cn, scoreColor } from '@/lib/utils';
@@ -325,33 +324,13 @@ export const DashboardPage: React.FC = () => {
         <StatCard label="Avg Reputation" value={avgScore} color={scoreColor(avgScore)} />
       </motion.div>
 
-      {/* Two-column: Graph + Top agents */}
+      {/* Two-column: Top agents + Quick actions */}
       <div className="grid grid-cols-5 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="col-span-3 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4 cursor-pointer hover:border-[#E8DCC4] transition-colors"
-          onClick={() => navigate('/graph')}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Link2 className="w-3.5 h-3.5 text-[#B08D3E]" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Trust Graph</span>
-            <span className="text-[9px] text-[#9C978E] ml-auto">Click to expand</span>
-          </div>
-          <TrustGraph
-            agents={agents}
-            delegations={delegations}
-            selectedId={null}
-            onSelect={(name) => navigate(`/agents/${name}`)}
-          />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="col-span-2 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4"
+          className="col-span-3 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4"
         >
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-3.5 h-3.5 text-[#B08D3E]" />
@@ -371,6 +350,50 @@ export const DashboardPage: React.FC = () => {
                 />
               </motion.div>
             ))}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="col-span-2 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-3.5 h-3.5 text-[#B08D3E]" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Quick Actions</span>
+          </div>
+          <div className="space-y-2">
+            <button
+              onClick={() => navigate('/agents/new')}
+              className="w-full text-left px-3 py-2.5 rounded-md border border-[#E8E5DE] hover:border-[#E8DCC4] hover:bg-[#FAF6ED] transition-colors flex items-center gap-2.5"
+            >
+              <UserPlus className="w-4 h-4 text-[#B08D3E]" />
+              <div>
+                <span className="text-xs font-medium text-[#1A1814]">Create Agent</span>
+                <p className="text-[10px] text-[#9C978E]">New delegation token</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/clients')}
+              className="w-full text-left px-3 py-2.5 rounded-md border border-[#E8E5DE] hover:border-[#E8DCC4] hover:bg-[#FAF6ED] transition-colors flex items-center gap-2.5"
+            >
+              <Link2 className="w-4 h-4 text-[#B08D3E]" />
+              <div>
+                <span className="text-xs font-medium text-[#1A1814]">Add Client</span>
+                <p className="text-[10px] text-[#9C978E]">Connect QuickBooks</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/escalations')}
+              className="w-full text-left px-3 py-2.5 rounded-md border border-[#E8E5DE] hover:border-[#E8DCC4] hover:bg-[#FAF6ED] transition-colors flex items-center gap-2.5"
+            >
+              <Activity className="w-4 h-4 text-[#B08D3E]" />
+              <div>
+                <span className="text-xs font-medium text-[#1A1814]">View Escalations</span>
+                <p className="text-[10px] text-[#9C978E]">Pending approvals</p>
+              </div>
+            </button>
           </div>
         </motion.div>
       </div>

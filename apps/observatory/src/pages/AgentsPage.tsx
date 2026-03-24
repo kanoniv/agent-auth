@@ -15,8 +15,6 @@ import { useTrend } from '@/hooks/useTrend';
 import { AgentCard } from '@/components/AgentCard';
 import { ReputationBadge } from '@/components/ReputationBadge';
 import { DelegationCard } from '@/components/DelegationCard';
-import { LearningCurve } from '@/components/LearningCurve';
-import { RLLoopDiagram } from '@/components/RLLoopDiagram';
 import { apiFetch } from '@/lib/api';
 import { cn, shortDid, scoreColor, statusDot, statusColor, timeAgo, shortId } from '@/lib/utils';
 import { DEFAULT_SCOPES, EXPIRY_OPTIONS } from '@/lib/constants';
@@ -419,7 +417,7 @@ export const AgentsPage: React.FC = () => {
                   {recallData && recallData.summary.total_outcomes > 0 ? (
                     <>
                       <div className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3">
-                        <RLLoopDiagram trend={recallData.summary.recent_trend} />
+                        <div className="text-xs text-[#6B6760] text-center py-4">Trend: {recallData.summary.recent_trend}</div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-3">
@@ -448,7 +446,7 @@ export const AgentsPage: React.FC = () => {
                               ))}
                             </div>
                           </div>
-                          <LearningCurve points={trendData.points} height={140} />
+                          <div className="text-xs text-[#9C978E] text-center py-6">{trendData.points.length} data points</div>
                         </div>
                       )}
 

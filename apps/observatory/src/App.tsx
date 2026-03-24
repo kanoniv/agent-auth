@@ -4,10 +4,6 @@ import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { AgentDetailPage } from './pages/AgentDetailPage';
-import { GraphPage } from './pages/GraphPage';
-import { ProvenancePage } from './pages/ProvenancePage';
-import { ToolsPage } from './pages/ToolsPage';
-import { VerifyPage } from './pages/VerifyPage';
 import { EscalationsPage } from './pages/EscalationsPage';
 import { AuditPage } from './pages/AuditPage';
 import { ClientsPage } from './pages/ClientsPage';
@@ -35,17 +31,13 @@ export const App: React.FC = () => (
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/agents/:name" element={<AgentDetailPage />} />
-        <Route path="/tools" element={<ToolsPage />} />
+        <Route path="/agents/new" element={<CreateAgentPage />} />
         <Route path="/escalations" element={<EscalationsPage />} />
         <Route path="/audit" element={<AuditPage />} />
         <Route path="/connect" element={<ConnectPage />} />
-        <Route path="/agents/new" element={<CreateAgentPage />} />
-        <Route path="/graph" element={<GraphPage />} />
-        <Route path="/provenance" element={<ProvenancePage />} />
-        <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   </ErrorBoundary>
