@@ -12,6 +12,8 @@ import { EscalationsPage } from './pages/EscalationsPage';
 import { AuditPage } from './pages/AuditPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { ConnectPage } from './pages/ConnectPage';
+import { CreateAgentPage } from './pages/CreateAgentPage';
 import { useAuth } from './hooks/useAuth';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,6 +37,8 @@ export const App: React.FC = () => (
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/escalations" element={<EscalationsPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/connect" element={<ConnectPage />} />
+        <Route path="/agents/new" element={<CreateAgentPage />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/provenance" element={<ProvenancePage />} />
         <Route path="/verify" element={<VerifyPage />} />
