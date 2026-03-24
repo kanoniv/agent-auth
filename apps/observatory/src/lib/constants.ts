@@ -1,15 +1,14 @@
 import {
   LayoutDashboard,
   Users,
-  Waypoints,
-  Shield,
-  ShieldCheck,
-  Wrench,
   AlertTriangle,
   FileCheck,
+  Building2,
+  Settings,
 } from 'lucide-react';
 
-export const GOLD = '#C5A572';
+export const GOLD = '#B08D3E';
+export const GOLD_HOVER = '#C5A572';
 
 export const DEFAULT_SCOPES = [
   'read', 'write', 'execute', 'delegate', 'admin',
@@ -34,42 +33,39 @@ export const EXPIRY_OPTIONS = [
 
 /** Dot colors for provenance timeline (ProvenancePage) */
 export const ACTION_DOT_COLORS: Record<string, string> = {
-  register: 'bg-emerald-400',
-  delegate: 'bg-[#C5A572]',
-  revoke: 'bg-red-400',
-  resolve: 'bg-blue-400',
-  merge: 'bg-purple-400',
-  mutate: 'bg-amber-400',
-  // MCP tool calls use tool: prefix
-  'tool:search_customers': 'bg-emerald-400',
-  'tool:search_invoices': 'bg-emerald-400',
-  'tool:search_vendors': 'bg-emerald-400',
-  'tool:search_bills': 'bg-emerald-400',
-  'tool:delete_bill': 'bg-red-400',
-  'tool:delete_customer': 'bg-red-400',
-  'tool:delete_vendor': 'bg-red-400',
-  'tool:create_invoice': 'bg-blue-400',
-  'tool:create_journal_entry': 'bg-amber-400',
-  'tool:create_employee': 'bg-amber-400',
+  register: 'bg-[#1A7A42]',
+  delegate: 'bg-[#B08D3E]',
+  revoke: 'bg-[#C23A3A]',
+  resolve: 'bg-[#2E6DA4]',
+  merge: 'bg-purple-600',
+  mutate: 'bg-[#B8860B]',
+  'tool:search_customers': 'bg-[#1A7A42]',
+  'tool:search_invoices': 'bg-[#1A7A42]',
+  'tool:search_vendors': 'bg-[#1A7A42]',
+  'tool:search_bills': 'bg-[#1A7A42]',
+  'tool:delete_bill': 'bg-[#C23A3A]',
+  'tool:delete_customer': 'bg-[#C23A3A]',
+  'tool:delete_vendor': 'bg-[#C23A3A]',
+  'tool:create_invoice': 'bg-[#2E6DA4]',
+  'tool:create_journal_entry': 'bg-[#B8860B]',
+  'tool:create_employee': 'bg-[#B8860B]',
 };
 
 /** Badge colors for action labels (ActivityFeed, ProvenancePage) */
 export const ACTION_BADGE_COLORS: Record<string, string> = {
-  register: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  delegate: 'bg-[#C5A572]/10 text-[#C5A572] border-[#C5A572]/20',
-  revoke: 'bg-red-500/10 text-red-400 border-red-500/20',
-  resolve: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  merge: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  mutate: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  register: 'bg-[#EDFAF2] text-[#1A7A42] border-[#C6F0D6]',
+  delegate: 'bg-[#FAF6ED] text-[#B08D3E] border-[#E8DCC4]',
+  revoke: 'bg-[#FDF0F0] text-[#C23A3A] border-[#F0C6C6]',
+  resolve: 'bg-[#EDF4FB] text-[#2E6DA4] border-[#B8D4F0]',
+  merge: 'bg-purple-50 text-purple-700 border-purple-200',
+  mutate: 'bg-[#FFF8E8] text-[#B8860B] border-[#F0DDB0]',
 };
 
 export const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard, path: '/' },
+  { id: 'clients', label: 'Clients', icon: Building2, path: '/clients' },
   { id: 'agents', label: 'Agents', icon: Users, path: '/agents' },
-  { id: 'tools', label: 'Tools', icon: Wrench, path: '/tools' },
   { id: 'escalations', label: 'Escalations', icon: AlertTriangle, path: '/escalations' },
   { id: 'audit', label: 'Audit', icon: FileCheck, path: '/audit' },
-  { id: 'graph', label: 'Trust Graph', icon: Waypoints, path: '/graph' },
-  { id: 'provenance', label: 'Provenance', icon: Shield, path: '/provenance' },
-  { id: 'verify', label: 'Verify', icon: ShieldCheck, path: '/verify' },
+  { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
 ] as const;

@@ -19,7 +19,7 @@ export const ReputationBadge: React.FC<ReputationBadgeProps> = ({ score, size = 
         <circle
           cx={radius + stroke} cy={radius + stroke} r={radius}
           fill="none" stroke="currentColor" strokeWidth={stroke}
-          className="text-zinc-800"
+          className="text-[#F7F6F3]"
         />
         <circle
           cx={radius + stroke} cy={radius + stroke} r={radius}

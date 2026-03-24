@@ -11,39 +11,39 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = {
-    pending: <Loader2 className="w-3 h-3 text-[#C5A572] animate-spin" />,
-    success: <CheckCircle2 className="w-3 h-3 text-emerald-400" />,
-    error: <XCircle className="w-3 h-3 text-red-400" />,
+    pending: <Loader2 className="w-3 h-3 text-[#B08D3E] animate-spin" />,
+    success: <CheckCircle2 className="w-3 h-3 text-[#1A7A42]" />,
+    error: <XCircle className="w-3 h-3 text-[#C23A3A]" />,
   }[toolCall.status];
 
   return (
-    <div className="rounded-lg bg-[#0a0a0f] border border-white/[.07] overflow-hidden">
+    <div className="rounded-lg bg-[#FAFAF8] border border-[#E8E5DE] overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/[.02] transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#F7F6F3] transition-colors"
       >
-        <Wrench className="w-3 h-3 text-zinc-500" />
-        <span className="text-[10px] font-mono text-[#C5A572]">{toolCall.name}</span>
+        <Wrench className="w-3 h-3 text-[#9C978E]" />
+        <span className="text-[10px] font-mono text-[#B08D3E]">{toolCall.name}</span>
         {statusIcon}
         <ChevronRight className={cn(
-          'w-3 h-3 text-zinc-600 ml-auto transition-transform',
+          'w-3 h-3 text-[#9C978E] ml-auto transition-transform',
           expanded && 'rotate-90',
         )} />
       </button>
       {expanded && (
-        <div className="px-3 pb-2.5 border-t border-white/5 space-y-2">
+        <div className="px-3 pb-2.5 border-t border-[#F0EDE6] space-y-2">
           {Object.keys(toolCall.args).length > 0 && (
             <div>
-              <div className="text-[8px] text-zinc-600 uppercase tracking-wider mt-2 mb-1">Arguments</div>
-              <pre className="text-[9px] text-zinc-400 bg-[#12121a] rounded p-2 overflow-x-auto">
+              <div className="text-[8px] text-[#9C978E] uppercase tracking-wider mt-2 mb-1">Arguments</div>
+              <pre className="text-[9px] text-[#6B6760] bg-white rounded p-2 overflow-x-auto">
                 {JSON.stringify(toolCall.args, null, 2)}
               </pre>
             </div>
           )}
           {toolCall.result !== undefined && (
             <div>
-              <div className="text-[8px] text-zinc-600 uppercase tracking-wider mb-1">Result</div>
-              <pre className="text-[9px] text-zinc-400 bg-[#12121a] rounded p-2 overflow-x-auto max-h-40">
+              <div className="text-[8px] text-[#9C978E] uppercase tracking-wider mb-1">Result</div>
+              <pre className="text-[9px] text-[#6B6760] bg-white rounded p-2 overflow-x-auto max-h-40">
                 {typeof toolCall.result === 'string' ? toolCall.result : JSON.stringify(toolCall.result, null, 2)}
               </pre>
             </div>

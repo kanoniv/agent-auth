@@ -2,22 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, Bell, CheckCircle2, XCircle, AlertTriangle, Activity, ArrowRight, PanelLeftClose, PanelLeftOpen, LogOut,
+  Bell, CheckCircle2, XCircle, AlertTriangle, Activity, ArrowRight, LogOut,
 } from 'lucide-react';
 import { NAV_ITEMS } from '@/lib/constants';
 import { cn, timeAgo, safeGetItem, safeSetItem } from '@/lib/utils';
 import { useConnection } from '@/hooks/useConnection';
 import { useMemory } from '@/hooks/useMemory';
-import { SettingsPanel } from './SettingsPanel';
 import { useAuth } from '@/hooks/useAuth';
 import type { OutcomeEntry } from '@/lib/types';
 
 function outcomeIcon(result: string) {
   switch (result) {
-    case 'success': return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
-    case 'failure': return <XCircle className="w-3.5 h-3.5 text-red-400" />;
-    case 'partial': return <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />;
-    default: return <Activity className="w-3.5 h-3.5 text-zinc-400" />;
+    case 'success': return <CheckCircle2 className="w-3.5 h-3.5 text-[#1A7A42]" />;
+    case 'failure': return <XCircle className="w-3.5 h-3.5 text-[#C23A3A]" />;
+    case 'partial': return <AlertTriangle className="w-3.5 h-3.5 text-[#B8860B]" />;
+    default: return <Activity className="w-3.5 h-3.5 text-[#9C978E]" />;
   }
 }
 
@@ -25,42 +24,15 @@ function agentFromAuthor(author: string): string {
   return author.startsWith('agent:') ? author.slice(6) : author;
 }
 
-function LogoutButton({ expanded }: { expanded: boolean }) {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-  const handleLogout = () => { logout(); navigate('/login'); };
-  return (
-    <motion.button
-      aria-label="Sign out"
-      className="w-full flex items-center h-9 px-3 gap-3 text-sm text-[#8B8B96] hover:text-[#F87171] transition-colors"
-      onClick={handleLogout}
-      whileHover={{ backgroundColor: 'rgba(248,113,113,0.05)' }}
-      transition={{ duration: 0.1 }}
-    >
-      <LogOut className="w-5 h-5 shrink-0" />
-      <motion.span
-        className="whitespace-nowrap"
-        animate={{ opacity: expanded ? 1 : 0 }}
-        transition={{ duration: 0.15 }}
-      >
-        Sign out
-      </motion.span>
-    </motion.button>
-  );
-}
-
 export const Layout: React.FC = () => {
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
-  const { connected, check } = useConnection();
+  const { connected } = useConnection();
   const { outcomes } = useMemory();
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
 
-  // Track which outcomes the user has "seen"
   const [lastSeenCount, setLastSeenCount] = useState(() => {
     const stored = safeGetItem('at-notif-seen');
     return stored ? parseInt(stored, 10) : 0;
@@ -75,7 +47,6 @@ export const Layout: React.FC = () => {
     }
   };
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
@@ -86,144 +57,97 @@ export const Layout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [bellOpen]);
 
-  // Listen for settings open event from other components
-  useEffect(() => {
-    const handler = () => setSettingsOpen(true);
-    window.addEventListener('open-settings', handler);
-    return () => window.removeEventListener('open-settings', handler);
-  }, []);
-
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
 
-  return (
-    <div className="flex h-screen bg-[#0a0a0f] overflow-hidden">
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onSave={() => { check(); }}
-      />
+  const handleLogout = () => { logout(); navigate('/login'); };
 
+  return (
+    <div className="flex h-screen bg-[#FAFAF8] overflow-hidden">
       {/* Sidebar */}
-      <motion.nav
-        className="relative flex flex-col h-full bg-[#12121a] border-r border-white/[.07] z-30 overflow-hidden"
-        animate={{ width: sidebarExpanded || sidebarHovered ? 220 : 48 }}
-        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] as const }}
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-      >
+      <nav className="w-[220px] flex flex-col h-full bg-white border-r border-[#E8E5DE] shrink-0">
         {/* Logo */}
-        <div className="flex items-center h-12 px-3 border-b border-white/[.07]">
-          <div className="w-6 h-6 rounded bg-[#C5A572] flex items-center justify-center shrink-0 cursor-pointer"
-            onClick={() => setSidebarExpanded(e => !e)}>
-            <span className="text-[10px] font-bold text-[#0a0a0f]">AT</span>
+        <div className="flex items-center gap-2.5 h-14 px-4 border-b border-[#F0EDE6]">
+          <div className="w-7 h-7 rounded-md bg-[#B08D3E] flex items-center justify-center shrink-0">
+            <span className="text-[10px] font-bold text-white">K</span>
           </div>
-          <motion.div
-            className="flex items-center gap-2 ml-3 whitespace-nowrap overflow-hidden"
-            animate={{ opacity: sidebarExpanded || sidebarHovered ? 1 : 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <span className="text-sm font-bold text-[#E8E8ED]">Agent Trust</span>
-            <button
-              onClick={() => setSidebarExpanded(e => !e)}
-              className="text-zinc-600 hover:text-zinc-400 transition-colors ml-auto"
-            >
-              {sidebarExpanded ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
-            </button>
-          </motion.div>
+          <span className="font-display text-[17px] text-[#1A1814]">Observatory</span>
         </div>
 
         {/* Nav items */}
-        <div className="flex-1 py-2 space-y-0.5">
+        <div className="flex-1 py-3 px-2 space-y-0.5">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.path);
             const Icon = item.icon;
             return (
-              <motion.button
+              <button
                 key={item.id}
                 className={cn(
-                  'w-full flex items-center h-9 px-3 gap-3 text-sm transition-colors relative',
-                  active ? 'text-[#C5A572]' : 'text-[#8B8B96] hover:text-[#E8E8ED]',
+                  'w-full flex items-center h-9 px-3 gap-2.5 text-[13px] rounded-md transition-colors relative',
+                  active
+                    ? 'bg-[#FAF6ED] text-[#B08D3E] font-semibold'
+                    : 'text-[#6B6760] hover:bg-[#F7F6F3] hover:text-[#1A1814]',
                 )}
                 onClick={() => navigate(item.path)}
-                whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                transition={{ duration: 0.1 }}
               >
-                {active && (
-                  <motion.div
-                    className="absolute left-0 top-1 bottom-1 w-0.5 bg-[#C5A572] rounded-r"
-                    layoutId="sidebar-active"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
+                <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
+                <span>{item.label}</span>
+                {item.id === 'escalations' && unseenCount > 0 && (
+                  <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#B8860B] text-[9px] font-bold text-white px-1">
+                    {unseenCount > 99 ? '99+' : unseenCount}
+                  </span>
                 )}
-                <span className="shrink-0">
-                  <Icon className="w-5 h-5" />
-                </span>
-                <motion.span
-                  className="whitespace-nowrap truncate"
-                  animate={{ opacity: sidebarExpanded || sidebarHovered ? 1 : 0 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  {item.label}
-                </motion.span>
-              </motion.button>
+              </button>
             );
           })}
         </div>
 
-        {/* Bottom: connection + settings */}
-        <div className="border-t border-white/[.07] py-2">
-          <motion.button
-            aria-label="Settings"
-            className="w-full flex items-center h-9 px-3 gap-3 text-sm text-[#8B8B96] hover:text-[#E8E8ED] transition-colors"
-            onClick={() => setSettingsOpen(true)}
-            whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-            transition={{ duration: 0.1 }}
+        {/* Bottom: user info + logout */}
+        <div className="border-t border-[#F0EDE6] p-3">
+          <div className="flex items-center gap-2 px-1 mb-2">
+            <div className="w-7 h-7 rounded-full bg-[#FAF6ED] border border-[#E8DCC4] flex items-center justify-center text-[10px] font-bold text-[#B08D3E]">
+              {(user?.email?.[0] || 'U').toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-[#1A1814] truncate">{user?.email || 'User'}</p>
+              <div className="flex items-center gap-1">
+                <span className={cn('w-1.5 h-1.5 rounded-full', connected ? 'bg-[#1A7A42]' : 'bg-[#9C978E]')} />
+                <span className="text-[9px] text-[#9C978E]">{connected ? 'Connected' : 'Offline'}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 h-8 text-[12px] text-[#9C978E] hover:text-[#C23A3A] hover:bg-[#FDF0F0] rounded-md transition-colors"
           >
-            <span className="shrink-0 relative">
-              <Settings className="w-5 h-5" />
-              <span className={cn(
-                'absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full',
-                connected ? 'bg-emerald-400' : 'bg-zinc-600',
-              )} />
-            </span>
-            <motion.span
-              className="whitespace-nowrap"
-              animate={{ opacity: sidebarExpanded || sidebarHovered ? 1 : 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              Settings
-            </motion.span>
-          </motion.button>
-          <LogoutButton expanded={sidebarExpanded || sidebarHovered} />
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
         </div>
-      </motion.nav>
+      </nav>
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="flex items-center justify-end h-10 px-4 border-b border-white/[.07] bg-[#0a0a0f] shrink-0">
-          {/* Bell */}
+        <header className="flex items-center justify-end h-12 px-5 border-b border-[#F0EDE6] bg-white shrink-0">
           <div ref={bellRef} className="relative">
             <button
               onClick={handleOpenBell}
-              aria-label={unseenCount > 0 ? `Notifications (${unseenCount} unread)` : 'Notifications'}
               className={cn(
-                'relative p-1.5 rounded-lg transition-colors',
-                bellOpen ? 'bg-white/[.05] text-[#E8E8ED]' : 'text-[#55555F] hover:text-[#8B8B96]',
+                'relative p-1.5 rounded-md transition-colors',
+                bellOpen ? 'bg-[#F7F6F3] text-[#1A1814]' : 'text-[#9C978E] hover:text-[#6B6760]',
               )}
             >
               <Bell className="w-4 h-4" />
               {unseenCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-[#C5A572] text-[8px] font-bold text-[#0a0a0f] px-1">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-[#B08D3E] text-[8px] font-bold text-white px-1">
                   {unseenCount > 99 ? '99+' : unseenCount}
                 </span>
               )}
             </button>
 
-            {/* Dropdown */}
             <AnimatePresence>
               {bellOpen && (
                 <motion.div
@@ -231,12 +155,12 @@ export const Layout: React.FC = () => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-1.5 w-80 max-h-[420px] overflow-y-auto rounded-xl bg-[#12121a] border border-white/[.07] shadow-2xl z-50"
+                  className="absolute right-0 top-full mt-1.5 w-80 max-h-[420px] overflow-y-auto rounded-lg bg-white border border-[#E8E5DE] shadow-lg z-50"
                 >
-                  <div className="px-3 py-2.5 border-b border-white/[.07] flex items-center gap-2">
-                    <Bell className="w-3.5 h-3.5 text-[#C5A572]" />
-                    <span className="text-xs font-semibold text-[#E8E8ED]">Agent Outcomes</span>
-                    <span className="text-[9px] text-zinc-600 ml-auto">{outcomes.length} total</span>
+                  <div className="px-3 py-2.5 border-b border-[#F0EDE6] flex items-center gap-2">
+                    <Bell className="w-3.5 h-3.5 text-[#B08D3E]" />
+                    <span className="text-xs font-semibold text-[#1A1814]">Agent Outcomes</span>
+                    <span className="text-[9px] text-[#9C978E] ml-auto">{outcomes.length} total</span>
                   </div>
 
                   {outcomes.length > 0 ? (
@@ -255,8 +179,8 @@ export const Layout: React.FC = () => {
                     </div>
                   ) : (
                     <div className="px-4 py-8 text-center">
-                      <Activity className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
-                      <p className="text-[10px] text-zinc-600">No outcomes yet</p>
+                      <Activity className="w-5 h-5 text-[#E8E5DE] mx-auto mb-2" />
+                      <p className="text-[10px] text-[#9C978E]">No outcomes yet</p>
                     </div>
                   )}
                 </motion.div>
@@ -287,35 +211,35 @@ const NotificationItem: React.FC<{
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left px-3 py-2 hover:bg-white/[.03] transition-colors flex items-start gap-2.5',
-        isNew && 'bg-[#C5A572]/[.03]',
+        'w-full text-left px-3 py-2 hover:bg-[#F7F6F3] transition-colors flex items-start gap-2.5',
+        isNew && 'bg-[#FAF6ED]',
       )}
     >
       <div className="mt-0.5">{outcomeIcon(result)}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-medium text-[#E8E8ED]">{agent}</span>
+          <span className="text-[10px] font-medium text-[#1A1814]">{agent}</span>
           {action && (
             <>
-              <ArrowRight className="w-2.5 h-2.5 text-zinc-700" />
-              <span className="text-[10px] text-zinc-500">{action}</span>
+              <ArrowRight className="w-2.5 h-2.5 text-[#E8E5DE]" />
+              <span className="text-[10px] text-[#9C978E]">{action}</span>
             </>
           )}
           {reward !== undefined && (
             <span className={cn(
               'text-[10px] font-mono font-bold ml-auto',
-              reward >= 0 ? 'text-emerald-400' : 'text-red-400',
+              reward >= 0 ? 'text-[#1A7A42]' : 'text-[#C23A3A]',
             )}>
               {reward >= 0 ? '+' : ''}{reward.toFixed(1)}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[9px] text-zinc-500 truncate flex-1">{outcome.title}</span>
-          <span className="text-[8px] text-zinc-600 shrink-0">{timeAgo(outcome.created_at)}</span>
+          <span className="text-[9px] text-[#9C978E] truncate flex-1">{outcome.title}</span>
+          <span className="text-[8px] text-[#9C978E] shrink-0">{timeAgo(outcome.created_at)}</span>
         </div>
       </div>
-      {isNew && <span className="w-1.5 h-1.5 rounded-full bg-[#C5A572] mt-1.5 shrink-0" />}
+      {isNew && <span className="w-1.5 h-1.5 rounded-full bg-[#B08D3E] mt-1.5 shrink-0" />}
     </button>
   );
 };

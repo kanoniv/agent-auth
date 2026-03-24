@@ -75,40 +75,40 @@ export const AuditPage: React.FC = () => {
     <motion.div className="p-6 max-w-5xl mx-auto" initial="hidden" animate="show" variants={stagger}>
       {/* Header */}
       <motion.div variants={fadeUp} className="mb-8">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Compliance</p>
-        <h1 className="text-2xl font-bold text-[#E8E8ED]">Audit Export</h1>
-        <p className="text-xs text-[#8B8B96] mt-1">Generate a verifiable audit package for any date range</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1">Compliance</p>
+        <h1 className="text-2xl font-display font-bold text-[#1A1814]">Audit Export</h1>
+        <p className="text-sm text-[#6B6760] mt-1">Generate a verifiable audit package for any date range</p>
       </motion.div>
 
       {/* Controls */}
-      <motion.div variants={fadeUp} className="bg-[#12121a] border border-white/[.07] rounded-xl p-5 mb-6">
+      <motion.div variants={fadeUp} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-5 mb-6">
         <div className="flex items-end gap-4 flex-wrap">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] flex items-center gap-1 mb-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] flex items-center gap-1 mb-1.5">
               <Calendar className="w-3 h-3" /> From
             </label>
             <input
               type="date"
               value={from}
               onChange={e => setFrom(e.target.value)}
-              className="bg-[#0a0a0f] border border-white/[.07] rounded-lg px-3 py-2.5 text-sm text-[#E8E8ED] focus:outline-none focus:border-[#C5A572]/40 transition-colors"
+              className="bg-[#FAFAF8] border border-[#E8E5DE] rounded-md px-3 py-2.5 text-sm text-[#1A1814] focus:outline-none focus:border-[#B08D3E] transition-colors"
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] flex items-center gap-1 mb-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] flex items-center gap-1 mb-1.5">
               <Calendar className="w-3 h-3" /> To
             </label>
             <input
               type="date"
               value={to}
               onChange={e => setTo(e.target.value)}
-              className="bg-[#0a0a0f] border border-white/[.07] rounded-lg px-3 py-2.5 text-sm text-[#E8E8ED] focus:outline-none focus:border-[#C5A572]/40 transition-colors"
+              className="bg-[#FAFAF8] border border-[#E8E5DE] rounded-md px-3 py-2.5 text-sm text-[#1A1814] focus:outline-none focus:border-[#B08D3E] transition-colors"
             />
           </div>
           <button
             onClick={handleExport}
             disabled={loading}
-            className="bg-[#C5A572] hover:bg-[#D4BC94] text-[#0a0a0f] font-bold text-sm rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <FileCheck className="w-4 h-4" />
             {loading ? 'Generating...' : 'Generate Package'}
@@ -119,7 +119,7 @@ export const AuditPage: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-[#F87171] flex items-center gap-2"
+            className="mt-4 p-3 rounded-lg bg-[#FDF0F0] border border-[#F0C6C6] text-sm text-[#C23A3A] flex items-center gap-2"
           >
             <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
           </motion.div>
@@ -137,11 +137,11 @@ export const AuditPage: React.FC = () => {
               { label: 'Agents', value: pkg.summary.unique_agents, icon: Users },
               { label: 'Delegations', value: pkg.summary.active_delegations, icon: Waypoints },
             ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="bg-[#12121a] border border-white/[.07] rounded-xl p-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] flex items-center gap-1 mb-2">
+              <div key={label} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] flex items-center gap-1 mb-2">
                   <Icon className="w-3 h-3" /> {label}
                 </p>
-                <p className="text-2xl font-bold tabular-nums text-[#C5A572]">
+                <p className="text-2xl font-data font-bold text-[#B08D3E]">
                   {value.toLocaleString()}
                 </p>
               </div>
@@ -149,25 +149,25 @@ export const AuditPage: React.FC = () => {
           </motion.div>
 
           {/* Verification */}
-          <motion.div variants={fadeUp} className="bg-[#12121a] border border-white/[.07] rounded-xl p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] flex items-center gap-1.5 mb-4">
-              <Hash className="w-3 h-3 text-[#C5A572]" /> Verification
+          <motion.div variants={fadeUp} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] flex items-center gap-1.5 mb-4">
+              <Hash className="w-3 h-3 text-[#B08D3E]" /> Verification
             </p>
             <div className="space-y-2.5">
               {[
-                ['Content Hash', <span className="font-mono text-xs select-all">{pkg.content_hash}</span>],
+                ['Content Hash', <span key="hash" className="font-mono text-xs bg-[#FAFAF8] border border-[#F0EDE6] rounded px-2 py-0.5 select-all text-[#1A1814]">{pkg.content_hash}</span>],
                 ['Generated', new Date(pkg.generated_at).toLocaleString()],
                 ['Date Range', `${pkg.date_range.from} to ${pkg.date_range.to}`],
                 ['Package Version', pkg.package_version],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex justify-between items-center">
-                  <span className="text-xs text-[#8B8B96]">{label}</span>
-                  <span className="text-sm text-[#E8E8ED]">{value}</span>
+                  <span className="text-xs text-[#6B6760]">{label}</span>
+                  <span className="text-sm text-[#1A1814]">{value}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-3 border-t border-white/[.03]">
-              <p className="text-[10px] text-[#55555F] leading-relaxed">
+            <div className="mt-4 pt-3 border-t border-[#F0EDE6]">
+              <p className="text-[10px] text-[#9C978E] leading-relaxed">
                 To verify: compute SHA-256 of the entries, escalations, delegations, and summary
                 fields. Compare against the content hash above. Any modification produces a different hash.
               </p>
@@ -176,18 +176,18 @@ export const AuditPage: React.FC = () => {
 
           {/* Escalation Breakdown */}
           {pkg.summary.total_escalations > 0 && (
-            <motion.div variants={fadeUp} className="bg-[#12121a] border border-white/[.07] rounded-xl p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-3">Escalation Breakdown</p>
+            <motion.div variants={fadeUp} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-3">Escalation Breakdown</p>
               <div className="flex gap-6">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#34D399]" />
-                  <span className="text-sm text-[#8B8B96]">Approved</span>
-                  <span className="text-sm font-bold tabular-nums text-[#E8E8ED]">{pkg.summary.escalations_approved}</span>
+                  <div className="w-2 h-2 rounded-full bg-[#1A7A42]" />
+                  <span className="text-sm text-[#6B6760]">Approved</span>
+                  <span className="text-sm font-data font-bold text-[#1A1814]">{pkg.summary.escalations_approved}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#F87171]" />
-                  <span className="text-sm text-[#8B8B96]">Denied</span>
-                  <span className="text-sm font-bold tabular-nums text-[#E8E8ED]">{pkg.summary.escalations_denied}</span>
+                  <div className="w-2 h-2 rounded-full bg-[#C23A3A]" />
+                  <span className="text-sm text-[#6B6760]">Denied</span>
+                  <span className="text-sm font-data font-bold text-[#1A1814]">{pkg.summary.escalations_denied}</span>
                 </div>
               </div>
             </motion.div>
@@ -197,7 +197,7 @@ export const AuditPage: React.FC = () => {
           <motion.div variants={fadeUp}>
             <button
               onClick={handleDownload}
-              className="w-full bg-[#C5A572] hover:bg-[#D4BC94] text-[#0a0a0f] font-bold text-sm rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#FAF6ED] border border-[#E8DCC4] text-[#B08D3E] font-semibold text-sm rounded-md px-4 py-3 transition-colors hover:bg-[#F5EFE0] flex items-center justify-center gap-2"
             >
               <Download className="w-5 h-5" />
               Download Audit Package ({(JSON.stringify(pkg).length / 1024).toFixed(1)} KB)
@@ -207,10 +207,10 @@ export const AuditPage: React.FC = () => {
       ) : !loading && !error ? (
         <motion.div variants={fadeUp} className="flex flex-col items-center gap-3 text-center py-16">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}>
-            <FileCheck className="w-10 h-10 text-[#C5A572]" />
+            <FileCheck className="w-10 h-10 text-[#B08D3E]" />
           </motion.div>
-          <p className="text-sm font-medium text-[#E8E8ED]">Select a date range to export</p>
-          <p className="text-xs text-[#55555F] max-w-sm">
+          <p className="text-sm font-medium text-[#1A1814]">Select a date range to export</p>
+          <p className="text-xs text-[#9C978E] max-w-sm">
             Packages include all provenance entries, escalation decisions, and active delegations with SHA-256 content verification
           </p>
         </motion.div>

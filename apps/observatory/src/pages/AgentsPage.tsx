@@ -243,10 +243,10 @@ export const AgentsPage: React.FC = () => {
 
   const outcomeIcon = (result: string) => {
     switch (result) {
-      case 'success': return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
-      case 'failure': return <XCircle className="w-3.5 h-3.5 text-red-400" />;
-      case 'partial': return <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />;
-      default: return <Activity className="w-3.5 h-3.5 text-zinc-400" />;
+      case 'success': return <CheckCircle2 className="w-3.5 h-3.5 text-[#1A7A42]" />;
+      case 'failure': return <XCircle className="w-3.5 h-3.5 text-[#C23A3A]" />;
+      case 'partial': return <AlertTriangle className="w-3.5 h-3.5 text-[#B8860B]" />;
+      default: return <Activity className="w-3.5 h-3.5 text-[#9C978E]" />;
     }
   };
 
@@ -261,29 +261,29 @@ export const AgentsPage: React.FC = () => {
   return (
     <div className="flex h-full">
       {/* Left panel - agent list */}
-      <div className="w-[340px] shrink-0 border-r border-white/[.07] flex flex-col">
-        <div className="p-3 border-b border-white/[.07]">
+      <div className="w-[340px] shrink-0 border-r border-[#E8E5DE] flex flex-col">
+        <div className="p-3 border-b border-[#E8E5DE]">
           <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-[#C5A572]" />
-            <span className="text-sm font-bold text-[#E8E8ED]">Agents</span>
-            <span className="text-[10px] text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded-full ml-auto">
+            <Users className="w-4 h-4 text-[#B08D3E]" />
+            <span className="text-sm font-bold font-display text-[#1A1814]">Agents</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] bg-[#F7F6F3] px-1.5 py-0.5 rounded-full ml-auto font-data">
               {agents.length}
             </span>
           </div>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9C978E]" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search agents..."
-              className="w-full pl-8 pr-3 py-2 text-xs bg-[#0a0a0f] border border-white/[.07] rounded-lg text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+              className="w-full pl-8 pr-3 py-2 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E]/50 focus:outline-none"
             />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {loading && agents.length === 0 ? (
             <div className="flex-1 flex items-center justify-center h-full">
-              <div className="w-6 h-6 border-2 border-[#C5A572] border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-[#B08D3E] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             filteredAgents.map(agent => (
@@ -314,39 +314,39 @@ export const AgentsPage: React.FC = () => {
                 <ReputationBadge score={selected.reputation?.composite_score ?? 50} size="lg" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-lg font-bold text-[#E8E8ED]">{selected.name}</h2>
+                    <h2 className="text-lg font-bold font-display text-[#1A1814]">{selected.name}</h2>
                     <span className={cn('w-2 h-2 rounded-full', statusDot(selected.status))} />
                     <span className={cn('text-xs', statusColor(selected.status))}>{selected.status}</span>
                     <button
                       onClick={() => navigate(`/agents/${selected.name}`)}
-                      className="ml-auto text-[10px] text-zinc-600 hover:text-[#C5A572] transition-colors"
+                      className="ml-auto text-[10px] text-[#9C978E] hover:text-[#B08D3E] transition-colors"
                     >
                       Full view
                     </button>
                   </div>
-                  {selected.description && <p className="text-xs text-zinc-500">{selected.description}</p>}
+                  {selected.description && <p className="text-xs text-[#6B6760]">{selected.description}</p>}
                   {selected.did && (
-                    <p className="text-[10px] font-mono text-zinc-600 mt-1">{shortDid(selected.did)}</p>
+                    <p className="text-[10px] font-mono text-[#9C978E] mt-1">{shortDid(selected.did)}</p>
                   )}
                 </div>
               </div>
 
               {/* Error banner */}
               {actionError && (
-                <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2">
-                  <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                  <span className="text-xs text-red-400 flex-1">{actionError}</span>
-                  <button onClick={() => setActionError(null)} className="text-red-400/60 hover:text-red-400 text-xs">dismiss</button>
+                <div className="mb-4 px-3 py-2 rounded-lg bg-[#FDF0F0] border border-[#C23A3A]/20 flex items-center gap-2">
+                  <XCircle className="w-3.5 h-3.5 text-[#C23A3A] shrink-0" />
+                  <span className="text-xs text-[#C23A3A] flex-1">{actionError}</span>
+                  <button onClick={() => setActionError(null)} className="text-[#C23A3A]/60 hover:text-[#C23A3A] text-xs">dismiss</button>
                 </div>
               )}
 
               {/* Tabs */}
-              <div className="flex gap-1 bg-[#0a0a0f] rounded-lg p-1 mb-5">
+              <div className="flex gap-1 bg-[#FAFAF8] rounded-lg p-1 mb-5">
                 {tabs.map(t => (
                   <button key={t.id} onClick={() => setDetailTab(t.id)}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                      detailTab === t.id ? 'bg-[#C5A572]/15 text-[#C5A572]' : 'text-zinc-500 hover:text-zinc-300'
+                      detailTab === t.id ? 'bg-[#FAF6ED] text-[#B08D3E]' : 'text-[#6B6760] hover:text-[#1A1814]'
                     )}>
                     {t.icon}
                     {t.label}
@@ -358,8 +358,8 @@ export const AgentsPage: React.FC = () => {
               {detailTab === 'overview' && (
                 <div className="space-y-4">
                   {/* Reputation breakdown */}
-                  <div className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-4">
-                    <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">Reputation Breakdown</h3>
+                  <div className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-3">Reputation Breakdown</h3>
                     {selected.reputation && (
                       <div className="space-y-3">
                         {[
@@ -371,11 +371,11 @@ export const AgentsPage: React.FC = () => {
                         ].map(b => (
                           <div key={b.label}>
                             <div className="flex items-center justify-between text-[10px] mb-1">
-                              <span className="text-zinc-400">{b.label}</span>
-                              <span className="text-zinc-600">{b.weight}</span>
+                              <span className="text-[#6B6760]">{b.label}</span>
+                              <span className="text-[#9C978E] font-data">{b.weight}</span>
                             </div>
-                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#C5A572] rounded-full transition-all duration-500"
+                            <div className="h-1.5 bg-[#F7F6F3] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#B08D3E] rounded-full transition-all duration-500"
                                 style={{ width: `${Math.max(0, Math.min(100, b.value))}%` }} />
                             </div>
                           </div>
@@ -386,11 +386,11 @@ export const AgentsPage: React.FC = () => {
 
                   {/* Capabilities */}
                   {selected.capabilities.length > 0 && (
-                    <div className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-4">
-                      <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Capabilities</h3>
+                    <div className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4">
+                      <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-2">Capabilities</h3>
                       <div className="flex flex-wrap gap-1.5">
                         {selected.capabilities.map(cap => (
-                          <span key={cap} className="text-[10px] px-2 py-1 rounded-md bg-white/[.04] text-zinc-400 border border-white/[.06]">
+                          <span key={cap} className="text-[10px] px-2 py-1 rounded-md bg-[#FAFAF8] text-[#6B6760] border border-[#F0EDE6]">
                             {cap}
                           </span>
                         ))}
@@ -405,9 +405,9 @@ export const AgentsPage: React.FC = () => {
                       { label: 'Tenure', value: `${selected.reputation?.tenure_days ?? 0}d` },
                       { label: 'Last Seen', value: timeAgo(selected.last_seen_at) },
                     ].map(s => (
-                      <div key={s.label} className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-3 text-center">
-                        <div className="text-sm font-bold text-[#E8E8ED]">{s.value}</div>
-                        <div className="text-[9px] text-zinc-600 mt-0.5">{s.label}</div>
+                      <div key={s.label} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3 text-center">
+                        <div className="text-sm font-bold font-data text-[#1A1814]">{s.value}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mt-0.5">{s.label}</div>
                       </div>
                     ))}
                   </div>
@@ -418,32 +418,32 @@ export const AgentsPage: React.FC = () => {
                 <div className="space-y-4">
                   {recallData && recallData.summary.total_outcomes > 0 ? (
                     <>
-                      <div className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-3">
+                      <div className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3">
                         <RLLoopDiagram trend={recallData.summary.recent_trend} />
                       </div>
 
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { label: 'Success', value: recallData.summary.success_rate !== null ? `${(recallData.summary.success_rate * 100).toFixed(0)}%` : '-', color: 'text-emerald-400' },
-                          { label: 'Avg Reward', value: recallData.summary.avg_reward !== null ? recallData.summary.avg_reward.toFixed(2) : '-', color: 'text-[#C5A572]' },
-                          { label: 'Outcomes', value: String(recallData.summary.total_outcomes), color: 'text-zinc-300' },
+                          { label: 'Success', value: recallData.summary.success_rate !== null ? `${(recallData.summary.success_rate * 100).toFixed(0)}%` : '-', color: 'text-[#1A7A42]' },
+                          { label: 'Avg Reward', value: recallData.summary.avg_reward !== null ? recallData.summary.avg_reward.toFixed(2) : '-', color: 'text-[#B08D3E]' },
+                          { label: 'Outcomes', value: String(recallData.summary.total_outcomes), color: 'text-[#1A1814]' },
                         ].map(s => (
-                          <div key={s.label} className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-3 text-center">
-                            <div className={cn('text-lg font-bold font-mono', s.color)}>{s.value}</div>
-                            <div className="text-[9px] text-zinc-600 mt-0.5">{s.label}</div>
+                          <div key={s.label} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3 text-center">
+                            <div className={cn('text-lg font-bold font-mono font-data', s.color)}>{s.value}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mt-0.5">{s.label}</div>
                           </div>
                         ))}
                       </div>
 
                       {trendData && trendData.points.length > 1 && (
-                        <div className="rounded-lg bg-[#0a0a0f] border border-white/[.07] p-4">
+                        <div className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-zinc-400 font-medium">Reward Signal</span>
+                            <span className="text-xs text-[#6B6760] font-medium">Reward Signal</span>
                             <div className="flex gap-1">
                               {['24h', '7d', '30d'].map(w => (
                                 <button key={w} onClick={() => setTrendWindow(w)}
                                   className={cn('text-[10px] px-2 py-1 rounded',
-                                    trendWindow === w ? 'bg-[#C5A572]/15 text-[#C5A572]' : 'text-zinc-600 hover:text-zinc-400'
+                                    trendWindow === w ? 'bg-[#FAF6ED] text-[#B08D3E]' : 'text-[#9C978E] hover:text-[#6B6760]'
                                   )}>{w}</button>
                               ))}
                             </div>
@@ -456,20 +456,20 @@ export const AgentsPage: React.FC = () => {
                         <div className="flex gap-4">
                           {recallData.summary.top_success_actions.length > 0 && (
                             <div className="flex-1">
-                              <div className="text-[10px] text-zinc-500 mb-1.5">Strong at</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5">Strong at</div>
                               <div className="flex flex-wrap gap-1">
                                 {recallData.summary.top_success_actions.map(a => (
-                                  <span key={a} className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{a}</span>
+                                  <span key={a} className="text-[10px] px-2 py-0.5 rounded bg-[#EDFAF2] text-[#1A7A42] border border-[#1A7A42]/20">{a}</span>
                                 ))}
                               </div>
                             </div>
                           )}
                           {recallData.summary.top_failure_actions.length > 0 && (
                             <div className="flex-1">
-                              <div className="text-[10px] text-zinc-500 mb-1.5">Weak at</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5">Weak at</div>
                               <div className="flex flex-wrap gap-1">
                                 {recallData.summary.top_failure_actions.map(a => (
-                                  <span key={a} className="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">{a}</span>
+                                  <span key={a} className="text-[10px] px-2 py-0.5 rounded bg-[#FDF0F0] text-[#C23A3A] border border-[#C23A3A]/20">{a}</span>
                                 ))}
                               </div>
                             </div>
@@ -478,27 +478,27 @@ export const AgentsPage: React.FC = () => {
                       )}
 
                       <div>
-                        <div className="text-[10px] text-zinc-500 mb-2">Recent Outcomes</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-2">Recent Outcomes</div>
                         <div className="space-y-1.5">
                           {recallData.entries.slice(0, 8).map(o => (
-                            <div key={o.id} className="flex items-center gap-2 rounded-lg bg-[#0a0a0f] border border-white/[.07] px-3 py-2">
+                            <div key={o.id} className="flex items-center gap-2 bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] px-3 py-2">
                               {outcomeIcon(o.metadata?.result ?? '')}
-                              <span className="text-[10px] text-zinc-300 flex-1 truncate">{o.title}</span>
+                              <span className="text-[10px] text-[#1A1814] flex-1 truncate">{o.title}</span>
                               {o.metadata?.reward_signal !== undefined && (
-                                <span className={cn('text-[10px] font-mono',
-                                  o.metadata.reward_signal >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                <span className={cn('text-[10px] font-mono font-data',
+                                  o.metadata.reward_signal >= 0 ? 'text-[#1A7A42]' : 'text-[#C23A3A]'
                                 )}>
                                   {o.metadata.reward_signal >= 0 ? '+' : ''}{o.metadata.reward_signal.toFixed(1)}
                                 </span>
                               )}
-                              <span className="text-[9px] text-zinc-600">{timeAgo(o.created_at)}</span>
+                              <span className="text-[9px] text-[#9C978E]">{timeAgo(o.created_at)}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     </>
                   ) : (
-                    <div className="text-xs text-zinc-600 py-8 text-center">
+                    <div className="text-xs text-[#9C978E] py-8 text-center">
                       {selected.did ? 'No outcomes recorded yet' : 'Agent has no DID - register with a DID to enable RL'}
                     </div>
                   )}
@@ -508,28 +508,28 @@ export const AgentsPage: React.FC = () => {
               {detailTab === 'delegations' && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs text-zinc-400">{selectedDelegations.length} delegation{selectedDelegations.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-[#6B6760]">{selectedDelegations.length} delegation{selectedDelegations.length !== 1 ? 's' : ''}</span>
                     <button onClick={() => setShowGrantForm(!showGrantForm)}
-                      className="ml-auto flex items-center gap-1 text-[10px] text-[#C5A572] hover:text-[#D4BC94] transition-colors">
+                      className="ml-auto flex items-center gap-1 text-[10px] text-[#B08D3E] hover:text-[#C5A572] transition-colors">
                       <Plus className="w-3 h-3" /> Grant
                     </button>
                   </div>
 
                   {showGrantForm && (
-                    <div className="rounded-lg bg-[#0a0a0f] border border-[#C5A572]/20 p-3 space-y-3">
+                    <div className="bg-white border border-[#E8DCC4] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3 space-y-3">
                       {/* Title */}
-                      <div className="text-[10px] font-semibold text-[#C5A572]">
+                      <div className="text-[10px] font-semibold text-[#B08D3E]">
                         {editingDelegationId ? 'Edit Delegation' : 'New Delegation'}
                       </div>
 
                       {/* Grantor picker */}
                       {!editingDelegationId && (
                         <div>
-                          <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">Grantor (who authorizes)</label>
+                          <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5 block">Grantor (who authorizes)</label>
                           <select
                             value={grantGrantor}
                             onChange={e => setGrantGrantor(e.target.value)}
-                            className="w-full text-xs bg-[#12121a] border border-white/[.07] rounded-lg px-2.5 py-1.5 text-zinc-300"
+                            className="w-full text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg px-2.5 py-1.5 text-[#1A1814]"
                           >
                             {agents.filter(a => a.name !== selectedName).map(a => (
                               <option key={a.name} value={a.name}>{a.name}</option>
@@ -540,7 +540,7 @@ export const AgentsPage: React.FC = () => {
 
                       {/* Scope selection */}
                       <div>
-                        <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">Scopes</label>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5 block">Scopes</label>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {DEFAULT_SCOPES.map(scope => (
                             <button key={scope} onClick={() => setGrantScopes(s =>
@@ -548,8 +548,8 @@ export const AgentsPage: React.FC = () => {
                             )}
                               className={cn('text-[10px] px-2 py-1 rounded border transition-colors',
                                 grantScopes.includes(scope)
-                                  ? 'bg-[#C5A572]/15 text-[#C5A572] border-[#C5A572]/30'
-                                  : 'text-zinc-500 border-white/[.07] hover:border-white/20'
+                                  ? 'bg-[#FAF6ED] text-[#B08D3E] border-[#E8DCC4]'
+                                  : 'text-[#6B6760] border-[#E8E5DE] hover:border-[#B08D3E]/30'
                               )}>{scope}</button>
                           ))}
                         </div>
@@ -566,7 +566,7 @@ export const AgentsPage: React.FC = () => {
                               }
                             }}
                             placeholder="Custom scope (e.g. billing.approve)"
-                            className="flex-1 px-2 py-1.5 text-[10px] bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                            className="flex-1 px-2 py-1.5 text-[10px] bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E]/50 focus:outline-none"
                           />
                           <button
                             onClick={() => {
@@ -577,7 +577,7 @@ export const AgentsPage: React.FC = () => {
                               }
                             }}
                             disabled={!grantCustomScope.trim()}
-                            className="px-2 py-1.5 text-[10px] rounded border border-white/[.07] text-zinc-500 hover:text-[#C5A572] hover:border-[#C5A572]/30 transition-colors disabled:opacity-30"
+                            className="px-2 py-1.5 text-[10px] rounded border border-[#E8E5DE] text-[#6B6760] hover:text-[#B08D3E] hover:border-[#E8DCC4] transition-colors disabled:opacity-30"
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -587,7 +587,7 @@ export const AgentsPage: React.FC = () => {
                           <div className="flex flex-wrap gap-1.5 mt-2">
                             {grantScopes.filter(s => !DEFAULT_SCOPES.includes(s)).map(scope => (
                               <button key={scope} onClick={() => setGrantScopes(s => s.filter(x => x !== scope))}
-                                className="text-[10px] px-2 py-1 rounded border bg-[#C5A572]/15 text-[#C5A572] border-[#C5A572]/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors">
+                                className="text-[10px] px-2 py-1 rounded border bg-[#FAF6ED] text-[#B08D3E] border-[#E8DCC4] hover:bg-[#FDF0F0] hover:text-[#C23A3A] hover:border-[#C23A3A]/20 transition-colors">
                                 {scope} &times;
                               </button>
                             ))}
@@ -597,9 +597,9 @@ export const AgentsPage: React.FC = () => {
 
                       {/* Expiry */}
                       <div>
-                        <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">Expiry</label>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5 block">Expiry</label>
                         <select value={grantExpiry} onChange={e => setGrantExpiry(Number(e.target.value))}
-                          className="w-full text-xs bg-[#12121a] border border-white/[.07] rounded-lg px-2 py-1.5 text-zinc-300">
+                          className="w-full text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg px-2 py-1.5 text-[#1A1814]">
                           {EXPIRY_OPTIONS.map(o => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
@@ -609,46 +609,46 @@ export const AgentsPage: React.FC = () => {
                       {/* Caveats toggle */}
                       <button
                         onClick={() => setGrantShowCaveats(!grantShowCaveats)}
-                        className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="text-[10px] text-[#6B6760] hover:text-[#1A1814] transition-colors"
                       >
                         {grantShowCaveats ? '- Hide caveats' : '+ Add caveats (budget, resources)'}
                       </button>
 
                       {grantShowCaveats && (
-                        <div className="space-y-2 pl-2 border-l-2 border-white/[.05]">
+                        <div className="space-y-2 pl-2 border-l-2 border-[#F0EDE6]">
                           <div>
-                            <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 block">
-                              Max Cost <span className="text-zinc-700">(optional)</span>
+                            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1 block">
+                              Max Cost <span className="text-[#9C978E]/60">(optional)</span>
                             </label>
                             <input
                               value={grantMaxCost}
                               onChange={e => setGrantMaxCost(e.target.value)}
                               placeholder="e.g. 50"
                               type="number"
-                              className="w-full px-2 py-1.5 text-[10px] bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                              className="w-full px-2 py-1.5 text-[10px] bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E]/50 focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 block">
-                              Allowed Resources <span className="text-zinc-700">(comma-separated, optional)</span>
+                            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1 block">
+                              Allowed Resources <span className="text-[#9C978E]/60">(comma-separated, optional)</span>
                             </label>
                             <input
                               value={grantResources}
                               onChange={e => setGrantResources(e.target.value)}
                               placeholder="e.g. db-prod, api-gateway, s3-uploads"
-                              className="w-full px-2 py-1.5 text-[10px] bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                              className="w-full px-2 py-1.5 text-[10px] bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E]/50 focus:outline-none"
                             />
                           </div>
                         </div>
                       )}
 
                       <button onClick={handleGrantDelegation} disabled={grantScopes.length === 0 || actionLoading}
-                        className="w-full text-xs py-2 rounded-lg bg-[#C5A572] text-[#0a0a0f] font-bold disabled:opacity-50 hover:bg-[#D4BC94] transition-colors">
+                        className="w-full text-xs py-2 rounded-md bg-[#B08D3E] text-white font-semibold disabled:opacity-50 hover:bg-[#C5A572] transition-colors">
                         {editingDelegationId ? 'Update Delegation' : 'Grant Delegation'}
                       </button>
                       {editingDelegationId && (
                         <button onClick={resetGrantForm}
-                          className="w-full text-xs py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">
+                          className="w-full text-xs py-1.5 rounded-lg text-[#6B6760] hover:text-[#1A1814] transition-colors">
                           Cancel
                         </button>
                       )}
@@ -668,101 +668,101 @@ export const AgentsPage: React.FC = () => {
                   {/* Tasks */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <ClipboardList className="w-3 h-3 text-zinc-500" />
-                      <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Tasks</span>
+                      <ClipboardList className="w-3 h-3 text-[#6B6760]" />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Tasks</span>
                       <button onClick={() => setShowTaskForm(!showTaskForm)}
-                        className="ml-auto text-[10px] text-[#C5A572] hover:text-[#D4BC94]">
+                        className="ml-auto text-[10px] text-[#B08D3E] hover:text-[#C5A572]">
                         <Plus className="w-3 h-3 inline" /> Add
                       </button>
                     </div>
                     {showTaskForm && (
-                      <div className="rounded-lg bg-[#0a0a0f] border border-[#C5A572]/20 p-3 space-y-2 mb-2">
+                      <div className="bg-white border border-[#E8DCC4] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3 space-y-2 mb-2">
                         <input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Task title"
-                          className="w-full px-2 py-1.5 text-xs bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#C5A572]/50" />
+                          className="w-full px-2 py-1.5 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:outline-none focus:border-[#B08D3E]/50" />
                         <textarea value={taskContent} onChange={e => setTaskContent(e.target.value)} placeholder="Description"
-                          className="w-full px-2 py-1.5 text-xs bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#C5A572]/50 h-16 resize-none" />
+                          className="w-full px-2 py-1.5 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:outline-none focus:border-[#B08D3E]/50 h-16 resize-none" />
                         <div className="flex gap-2">
                           <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}
-                            className="text-xs bg-[#12121a] border border-white/[.07] rounded px-2 py-1.5 text-zinc-300">
+                            className="text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded px-2 py-1.5 text-[#1A1814]">
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
                             <option value="high">High</option>
                           </select>
                           <button onClick={handleCreateTask} disabled={!taskTitle || actionLoading}
-                            className="flex-1 text-xs py-1.5 rounded bg-[#C5A572] text-[#0a0a0f] font-bold disabled:opacity-50">Create</button>
+                            className="flex-1 text-xs py-1.5 rounded-md bg-[#B08D3E] text-white font-semibold disabled:opacity-50 hover:bg-[#C5A572] transition-colors">Create</button>
                         </div>
                       </div>
                     )}
                     {selectedTasks.length > 0 ? selectedTasks.map(t => (
-                      <div key={t.id} className="flex items-center gap-2 rounded-lg bg-[#0a0a0f] border border-white/[.07] px-3 py-2 mb-1.5">
+                      <div key={t.id} className="flex items-center gap-2 bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] px-3 py-2 mb-1.5">
                         <button onClick={() => handleCompleteTask(t.id)}
-                          className="text-zinc-600 hover:text-emerald-400 transition-colors">
+                          className="text-[#9C978E] hover:text-[#1A7A42] transition-colors">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                         </button>
-                        <span className="text-[10px] text-zinc-300 flex-1">{t.title}</span>
+                        <span className="text-[10px] text-[#1A1814] flex-1">{t.title}</span>
                         <span className={cn('text-[9px] px-1.5 py-0.5 rounded',
-                          t.metadata?.priority === 'high' ? 'bg-red-500/10 text-red-400' :
-                          t.metadata?.priority === 'low' ? 'bg-zinc-500/10 text-zinc-400' :
-                          'bg-amber-500/10 text-amber-400'
+                          t.metadata?.priority === 'high' ? 'bg-[#FDF0F0] text-[#C23A3A]' :
+                          t.metadata?.priority === 'low' ? 'bg-[#F7F6F3] text-[#6B6760]' :
+                          'bg-[#FAF6ED] text-[#B8860B]'
                         )}>{t.metadata?.priority || 'medium'}</span>
                       </div>
-                    )) : <div className="text-[10px] text-zinc-600 py-2">No tasks assigned</div>}
+                    )) : <div className="text-[10px] text-[#9C978E] py-2">No tasks assigned</div>}
                   </div>
 
                   {/* Memory entries */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <Brain className="w-3 h-3 text-zinc-500" />
-                      <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Memory</span>
+                      <Brain className="w-3 h-3 text-[#6B6760]" />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Memory</span>
                       <button onClick={() => setShowMemoryForm(!showMemoryForm)}
-                        className="ml-auto text-[10px] text-[#C5A572] hover:text-[#D4BC94]">
+                        className="ml-auto text-[10px] text-[#B08D3E] hover:text-[#C5A572]">
                         <Plus className="w-3 h-3 inline" /> Add
                       </button>
                     </div>
                     {showMemoryForm && (
-                      <div className="rounded-lg bg-[#0a0a0f] border border-[#C5A572]/20 p-3 space-y-2 mb-2">
+                      <div className="bg-white border border-[#E8DCC4] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-3 space-y-2 mb-2">
                         <select value={memoryType} onChange={e => setMemoryType(e.target.value)}
-                          className="w-full text-xs bg-[#12121a] border border-white/[.07] rounded px-2 py-1.5 text-zinc-300">
+                          className="w-full text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded px-2 py-1.5 text-[#1A1814]">
                           {['knowledge', 'decision', 'investigation', 'pattern'].map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
                         </select>
                         <input value={memoryTitle} onChange={e => setMemoryTitle(e.target.value)} placeholder="Title"
-                          className="w-full px-2 py-1.5 text-xs bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#C5A572]/50" />
+                          className="w-full px-2 py-1.5 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:outline-none focus:border-[#B08D3E]/50" />
                         <textarea value={memoryContent} onChange={e => setMemoryContent(e.target.value)} placeholder="Content"
-                          className="w-full px-2 py-1.5 text-xs bg-[#12121a] border border-white/[.07] rounded text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-[#C5A572]/50 h-16 resize-none" />
+                          className="w-full px-2 py-1.5 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded text-[#1A1814] placeholder-[#9C978E] focus:outline-none focus:border-[#B08D3E]/50 h-16 resize-none" />
                         <button onClick={handleCreateMemory} disabled={!memoryTitle || actionLoading}
-                          className="w-full text-xs py-1.5 rounded bg-[#C5A572] text-[#0a0a0f] font-bold disabled:opacity-50">Save</button>
+                          className="w-full text-xs py-1.5 rounded-md bg-[#B08D3E] text-white font-semibold disabled:opacity-50 hover:bg-[#C5A572] transition-colors">Save</button>
                       </div>
                     )}
                     {selectedMemories.length > 0 ? selectedMemories.slice(0, 10).map(m => {
                       const isExpanded = expandedMemoryId === m.id;
                       return (
-                        <div key={m.id} className="rounded-lg bg-[#0a0a0f] border border-white/[.07] mb-1.5 overflow-hidden">
+                        <div key={m.id} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] mb-1.5 overflow-hidden">
                           <button
                             onClick={() => setExpandedMemoryId(isExpanded ? null : m.id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/[.02] transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#F7F6F3] transition-colors"
                           >
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">{m.entry_type}</span>
-                            <span className={cn('text-[10px] text-zinc-300 flex-1', !isExpanded && 'truncate')}>{m.title}</span>
-                            <ChevronRight className={cn('w-3 h-3 text-zinc-600 shrink-0 transition-transform', isExpanded && 'rotate-90')} />
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F3EEFF] text-[#7C3AED] border border-[#7C3AED]/20 shrink-0">{m.entry_type}</span>
+                            <span className={cn('text-[10px] text-[#1A1814] flex-1', !isExpanded && 'truncate')}>{m.title}</span>
+                            <ChevronRight className={cn('w-3 h-3 text-[#9C978E] shrink-0 transition-transform', isExpanded && 'rotate-90')} />
                           </button>
                           {isExpanded && (
                             <div className="px-3 pb-3 space-y-2">
                               {m.content && (
-                                <p className="text-[10px] text-zinc-400 leading-relaxed">{m.content}</p>
+                                <p className="text-[10px] text-[#6B6760] leading-relaxed">{m.content}</p>
                               )}
-                              <div className="flex items-center gap-3 text-[9px] text-zinc-600">
+                              <div className="flex items-center gap-3 text-[9px] text-[#9C978E]">
                                 <span>{m.author}</span>
                                 <span>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 <button onClick={() => handleArchiveMemory(m.id)}
-                                  className="ml-auto text-zinc-600 hover:text-red-400 transition-colors">archive</button>
+                                  className="ml-auto text-[#9C978E] hover:text-[#C23A3A] transition-colors">archive</button>
                               </div>
                             </div>
                           )}
                         </div>
                       );
-                    }) : <div className="text-[10px] text-zinc-600 py-2">No memory entries</div>}
+                    }) : <div className="text-[10px] text-[#9C978E] py-2">No memory entries</div>}
                   </div>
                 </div>
               )}
@@ -770,15 +770,15 @@ export const AgentsPage: React.FC = () => {
               {detailTab === 'provenance' && (
                 <div className="space-y-1.5">
                   {selectedProvenance.length > 0 ? selectedProvenance.slice(0, 20).map(p => (
-                    <div key={p.id} className="flex items-center gap-2 rounded-lg bg-[#0a0a0f] border border-white/[.07] px-3 py-2">
-                      <span className="text-[10px] text-[#C5A572] min-w-[60px]">{p.action}</span>
-                      <span className="text-[9px] font-mono text-zinc-600 flex-1 truncate">
+                    <div key={p.id} className="flex items-center gap-2 bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] px-3 py-2">
+                      <span className="text-[10px] text-[#B08D3E] min-w-[60px]">{p.action}</span>
+                      <span className="text-[9px] font-mono text-[#9C978E] flex-1 truncate">
                         {p.entity_ids.map(id => shortId(id)).join(', ')}
                       </span>
-                      <span className="text-[9px] text-zinc-600 shrink-0">{timeAgo(p.created_at)}</span>
+                      <span className="text-[9px] text-[#9C978E] shrink-0">{timeAgo(p.created_at)}</span>
                     </div>
                   )) : (
-                    <div className="text-[10px] text-zinc-600 py-8 text-center">No provenance entries</div>
+                    <div className="text-[10px] text-[#9C978E] py-8 text-center">No provenance entries</div>
                   )}
                 </div>
               )}
@@ -788,11 +788,11 @@ export const AgentsPage: React.FC = () => {
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex-1 flex flex-col items-center justify-center h-full text-zinc-600"
+              className="flex-1 flex flex-col items-center justify-center h-full text-[#9C978E]"
             >
               <Users className="w-10 h-10 mb-3 opacity-30" />
               <p className="text-sm">Select an agent</p>
-              <p className="text-[10px] text-zinc-700 mt-1">Click an agent from the list to view details</p>
+              <p className="text-[10px] text-[#9C978E] mt-1">Click an agent from the list to view details</p>
             </motion.div>
           )}
         </AnimatePresence>

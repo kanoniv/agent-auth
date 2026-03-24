@@ -104,20 +104,20 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
       >
         <motion.div
           variants={staggerItem}
-          className="rounded-2xl bg-[#12121a] border border-white/[.07] p-8"
+          className="bg-white border border-[#E8E5DE] rounded-lg p-8 shadow-[0_2px_8px_rgba(26,24,20,0.06)]"
         >
           {/* Header */}
           <div className="flex flex-col items-center text-center mb-8">
             <motion.div
               variants={staggerItem}
-              className="w-12 h-12 rounded-xl bg-[#C5A572]/10 border border-[#C5A572]/20 flex items-center justify-center mb-4"
+              className="w-12 h-12 rounded-xl bg-[#FAF6ED] border border-[#E8DCC4] flex items-center justify-center mb-4"
             >
-              <Shield className="w-6 h-6 text-[#C5A572]" />
+              <Shield className="w-6 h-6 text-[#B08D3E]" />
             </motion.div>
-            <motion.h1 variants={staggerItem} className="text-xl font-bold text-[#E8E8ED] mb-2">
+            <motion.h1 variants={staggerItem} className="text-xl font-bold font-display text-[#1A1814] mb-2">
               Welcome to Agent Trust
             </motion.h1>
-            <motion.p variants={staggerItem} className="text-sm text-[#8B8B96] max-w-md">
+            <motion.p variants={staggerItem} className="text-sm text-[#6B6760] max-w-md">
               The identity, delegation, and reputation layer for AI agent systems.
               Get started in three steps.
             </motion.p>
@@ -129,14 +129,14 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
               <motion.div
                 key={step.num}
                 variants={staggerItem}
-                className="rounded-xl bg-white/[.02] border border-white/[.05] p-4 flex flex-col items-center text-center"
+                className="rounded-lg bg-[#FAFAF8] border border-[#F0EDE6] p-4 flex flex-col items-center text-center"
               >
-                <div className="w-6 h-6 rounded-full bg-[#C5A572]/15 border border-[#C5A572]/25 flex items-center justify-center text-[10px] font-bold text-[#C5A572] mb-3">
+                <div className="w-6 h-6 rounded-full bg-[#FAF6ED] border border-[#E8DCC4] flex items-center justify-center text-[10px] font-bold text-[#B08D3E] mb-3">
                   {step.num}
                 </div>
-                <step.icon className="w-4 h-4 text-[#8B8B96] mb-2" />
-                <span className="text-xs font-semibold text-[#E8E8ED] mb-1">{step.title}</span>
-                <span className="text-[10px] text-[#55555F] leading-snug">{step.desc}</span>
+                <step.icon className="w-4 h-4 text-[#9C978E] mb-2" />
+                <span className="text-xs font-semibold text-[#1A1814] mb-1">{step.title}</span>
+                <span className="text-[10px] text-[#9C978E] leading-snug">{step.desc}</span>
               </motion.div>
             ))}
           </div>
@@ -150,46 +150,46 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden mb-6"
               >
-                <div className="rounded-xl bg-white/[.02] border border-[#C5A572]/20 p-4 space-y-3">
+                <div className="rounded-lg bg-[#FAFAF8] border border-[#E8DCC4] p-4 space-y-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <UserPlus className="w-3.5 h-3.5 text-[#C5A572]" />
-                    <span className="text-xs font-semibold text-[#E8E8ED]">Register Your First Agent</span>
+                    <UserPlus className="w-3.5 h-3.5 text-[#B08D3E]" />
+                    <span className="text-xs font-semibold text-[#1A1814]">Register Your First Agent</span>
                   </div>
                   <div>
-                    <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 block">Name *</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1 block">Name *</label>
                     <input
                       value={regName}
                       onChange={e => setRegName(e.target.value)}
                       placeholder="e.g. researcher, coordinator, reviewer"
-                      className="w-full px-3 py-2 text-xs bg-[#0a0a0f] border border-white/[.07] rounded-lg text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                      className="w-full px-3 py-2 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E] focus:outline-none"
                       onKeyDown={e => e.key === 'Enter' && handleRegister()}
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 block">Description</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1 block">Description</label>
                     <input
                       value={regDesc}
                       onChange={e => setRegDesc(e.target.value)}
                       placeholder="What does this agent do?"
-                      className="w-full px-3 py-2 text-xs bg-[#0a0a0f] border border-white/[.07] rounded-lg text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                      className="w-full px-3 py-2 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 block">Capabilities <span className="text-zinc-700">(comma-separated)</span></label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1 block">Capabilities <span className="text-[#9C978E]">(comma-separated)</span></label>
                     <input
                       value={regCaps}
                       onChange={e => setRegCaps(e.target.value)}
                       placeholder="search, analyze, summarize"
-                      className="w-full px-3 py-2 text-xs bg-[#0a0a0f] border border-white/[.07] rounded-lg text-zinc-300 placeholder-zinc-600 focus:border-[#C5A572]/50 focus:outline-none"
+                      className="w-full px-3 py-2 text-xs bg-[#FAFAF8] border border-[#E8E5DE] rounded-lg text-[#1A1814] placeholder-[#9C978E] focus:border-[#B08D3E] focus:outline-none"
                     />
                   </div>
                   <button
                     onClick={handleRegister}
                     disabled={!regName.trim() || registering}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-[#C5A572] text-[#0a0a0f] text-xs font-bold hover:bg-[#D4BC94] transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-[#B08D3E] text-white text-xs font-bold hover:bg-[#C5A572] transition-colors disabled:opacity-50"
                   >
                     {registering ? (
-                      <div className="w-3.5 h-3.5 border-2 border-[#12121a]/40 border-t-[#12121a] rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     ) : (
                       <UserPlus className="w-3.5 h-3.5" />
                     )}
@@ -207,15 +207,15 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
               className={cn(
                 'flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all',
                 showRegister
-                  ? 'border border-white/[.07] text-zinc-400 hover:text-zinc-200'
-                  : 'bg-[#C5A572] text-[#12121a] hover:bg-[#d4b682]',
+                  ? 'border border-[#E8E5DE] text-[#6B6760] hover:text-[#1A1814] hover:bg-[#F7F6F3]'
+                  : 'bg-[#B08D3E] text-white hover:bg-[#C5A572]',
               )}
             >
               <UserPlus className="w-4 h-4" />
               {showRegister ? 'Cancel' : 'Register an Agent'}
             </button>
 
-            <div className="flex items-center gap-3 text-[10px] text-[#55555F]">
+            <div className="flex items-center gap-3 text-[10px] text-[#9C978E]">
               <span>or</span>
             </div>
 
@@ -223,24 +223,24 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
               <button
                 onClick={handleSeed}
                 disabled={seeding}
-                className="flex items-center gap-1.5 text-[10px] text-[#55555F] hover:text-[#C5A572] transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-[10px] text-[#9C978E] hover:text-[#B08D3E] transition-colors disabled:opacity-50"
               >
                 {seeding ? (
-                  <div className="w-3 h-3 border-2 border-zinc-600 border-t-[#C5A572] rounded-full animate-spin" />
+                  <div className="w-3 h-3 border-2 border-[#E8E5DE] border-t-[#B08D3E] rounded-full animate-spin" />
                 ) : (
                   <Rocket className="w-3 h-3" />
                 )}
                 Load Demo Scenario
               </button>
 
-              <span className="text-zinc-800">|</span>
+              <span className="text-[#E8E5DE]">|</span>
 
               <button
                 onClick={() => {
                   // Trigger settings panel via custom event
                   window.dispatchEvent(new CustomEvent('open-settings'));
                 }}
-                className="flex items-center gap-1.5 text-[10px] text-[#55555F] hover:text-[#8B8B96] transition-colors"
+                className="flex items-center gap-1.5 text-[10px] text-[#9C978E] hover:text-[#6B6760] transition-colors"
               >
                 <Settings className="w-3 h-3" />
                 Connect to existing API
@@ -251,7 +251,7 @@ const GettingStarted: React.FC<{ onSeeded: () => void }> = ({ onSeeded }) => {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-xs text-red-400 mt-1 text-center max-w-sm"
+                className="text-xs text-[#C23A3A] mt-1 text-center max-w-sm"
               >
                 {error}
               </motion.p>
@@ -288,7 +288,7 @@ export const DashboardPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-[#C5A572] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#B08D3E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -305,9 +305,9 @@ export const DashboardPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-3"
       >
-        <Shield className="w-5 h-5 text-[#C5A572]" />
-        <h1 className="text-lg font-bold text-[#E8E8ED]">Dashboard</h1>
-        <span className="text-[10px] text-zinc-600 bg-zinc-800/50 px-2 py-0.5 rounded-full">
+        <Shield className="w-5 h-5 text-[#B08D3E]" />
+        <h1 className="text-lg font-bold font-display text-[#1A1814]">Dashboard</h1>
+        <span className="text-[10px] text-[#6B6760] bg-[#F7F6F3] px-2 py-0.5 rounded-full">
           {agents.length} agent{agents.length !== 1 ? 's' : ''}
         </span>
       </motion.div>
@@ -320,7 +320,7 @@ export const DashboardPage: React.FC = () => {
         className="grid grid-cols-4 gap-3"
       >
         <StatCard label="Total Agents" value={agents.length} icon={Users} />
-        <StatCard label="Active Delegations" value={activeDelegations.length} icon={Link2} color="text-[#C5A572]" />
+        <StatCard label="Active Delegations" value={activeDelegations.length} icon={Link2} color="text-[#B08D3E]" />
         <StatCard label="Actions Today" value={actionsToday} icon={Activity} />
         <StatCard label="Avg Reputation" value={avgScore} color={scoreColor(avgScore)} />
       </motion.div>
@@ -331,13 +331,13 @@ export const DashboardPage: React.FC = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="col-span-3 rounded-xl bg-[#12121a] border border-white/[.07] p-4 cursor-pointer hover:border-white/[.12] transition-colors"
+          className="col-span-3 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4 cursor-pointer hover:border-[#E8DCC4] transition-colors"
           onClick={() => navigate('/graph')}
         >
           <div className="flex items-center gap-2 mb-3">
-            <Link2 className="w-3.5 h-3.5 text-[#C5A572]" />
-            <span className="text-xs font-semibold text-zinc-400">Trust Graph</span>
-            <span className="text-[9px] text-zinc-600 ml-auto">Click to expand</span>
+            <Link2 className="w-3.5 h-3.5 text-[#B08D3E]" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Trust Graph</span>
+            <span className="text-[9px] text-[#9C978E] ml-auto">Click to expand</span>
           </div>
           <TrustGraph
             agents={agents}
@@ -351,11 +351,11 @@ export const DashboardPage: React.FC = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="col-span-2 rounded-xl bg-[#12121a] border border-white/[.07] p-4"
+          className="col-span-2 rounded-lg bg-white border border-[#E8E5DE] shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-4"
         >
           <div className="flex items-center gap-2 mb-3">
-            <Users className="w-3.5 h-3.5 text-[#C5A572]" />
-            <span className="text-xs font-semibold text-zinc-400">Top Agents</span>
+            <Users className="w-3.5 h-3.5 text-[#B08D3E]" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Top Agents</span>
           </div>
           <div className="space-y-1">
             {agents.slice(0, 5).map((agent, i) => (
@@ -382,8 +382,8 @@ export const DashboardPage: React.FC = () => {
         transition={{ delay: 0.2 }}
       >
         <div className="flex items-center gap-2 mb-3">
-          <Activity className="w-3.5 h-3.5 text-[#C5A572]" />
-          <span className="text-xs font-semibold text-zinc-400">Recent Activity</span>
+          <Activity className="w-3.5 h-3.5 text-[#B08D3E]" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E]">Recent Activity</span>
         </div>
         <ActivityFeed entries={provenance} limit={10} />
       </motion.div>

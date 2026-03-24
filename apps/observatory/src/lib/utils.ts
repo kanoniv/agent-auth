@@ -53,18 +53,18 @@ export function statusColor(status: string): string {
 
 export function statusDot(status: string): string {
   switch (status) {
-    case 'online': return 'bg-emerald-400';
-    case 'idle': return 'bg-amber-400';
-    case 'offline': return 'bg-zinc-600';
-    default: return 'bg-zinc-600';
+    case 'online': return 'bg-[#1A7A42]';
+    case 'idle': return 'bg-[#B8860B]';
+    case 'offline': return 'bg-[#9C978E]';
+    default: return 'bg-[#9C978E]';
   }
 }
 
 export function scoreColor(score: number): string {
-  if (score >= 80) return 'text-emerald-400';
-  if (score >= 60) return 'text-amber-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
+  if (score >= 80) return 'text-[#1A7A42]';
+  if (score >= 60) return 'text-[#B8860B]';
+  if (score >= 40) return 'text-[#B8860B]';
+  return 'text-[#C23A3A]';
 }
 
 export function scoreFill(score: number): string {

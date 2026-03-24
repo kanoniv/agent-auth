@@ -65,27 +65,35 @@ export const CreateAgentPage: React.FC = () => {
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 15 }}
           >
-            <Shield className="w-10 h-10 text-[#C5A572] mx-auto mb-3" />
+            <div className="w-12 h-12 rounded-full bg-[#FAF6ED] border border-[#E8DCC4] flex items-center justify-center mx-auto mb-3">
+              <Shield className="w-6 h-6 text-[#B08D3E]" />
+            </div>
           </motion.div>
-          <h1 className="text-2xl font-bold text-[#E8E8ED]">Agent Created</h1>
-          <p className="text-xs text-[#8B8B96] mt-1">Copy this token now. You won't see it again.</p>
+          <h1 className="text-2xl font-display font-bold text-[#1A1814]">Agent Created</h1>
+          <p className="text-sm text-[#6B6760] mt-1">Copy this token now. You won't see it again.</p>
         </motion.div>
 
-        <motion.div variants={fadeUp} className="bg-[#12121a] border border-[#C5A572]/20 rounded-xl p-6 space-y-4">
+        {/* One-time warning */}
+        <motion.div variants={fadeUp} className="mb-4 p-3 rounded-lg bg-[#FFF8E8] border border-[#F0DDB0] text-sm text-[#B8860B] flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          This token is displayed only once. Store it securely before leaving this page.
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-6 space-y-4">
           {/* Token display */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-2">Delegation Token</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-2">Delegation Token</p>
             <div className="relative">
-              <pre className="bg-[#0a0a0f] rounded-lg p-4 text-xs text-[#C5A572] font-mono break-all select-all overflow-x-auto max-h-32">
+              <pre className="bg-[#FAFAF8] border border-[#F0EDE6] rounded-lg p-4 text-xs text-[#1A1814] font-mono break-all select-all overflow-x-auto max-h-32">
                 {token}
               </pre>
               <button
                 onClick={handleCopy}
-                className="absolute top-2 right-2 p-2 rounded-lg bg-[#12121a] border border-white/[.07] hover:border-[#C5A572]/40 transition-colors"
+                className="absolute top-2 right-2 p-2 rounded-md bg-[#FAF6ED] border border-[#E8DCC4] hover:bg-[#F5EFE0] transition-colors"
               >
                 {copied
-                  ? <CheckCircle className="w-4 h-4 text-[#34D399]" />
-                  : <Copy className="w-4 h-4 text-[#8B8B96]" />
+                  ? <CheckCircle className="w-4 h-4 text-[#1A7A42]" />
+                  : <Copy className="w-4 h-4 text-[#B08D3E]" />
                 }
               </button>
             </div>
@@ -100,17 +108,17 @@ export const CreateAgentPage: React.FC = () => {
               ['Expires', '30 days'],
             ].map(([label, value]) => (
               <div key={label}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-0.5">{label}</p>
-                <p className="text-sm text-[#E8E8ED]">{value}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-0.5">{label}</p>
+                <p className="text-sm text-[#1A1814]">{value}</p>
               </div>
             ))}
           </div>
 
-          {/* Try it */}
-          <div className="pt-2 border-t border-white/[.07]">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-2">Try It</p>
-            <div className="bg-[#0a0a0f] rounded-lg p-3">
-              <pre className="text-xs text-[#8B8B96] font-mono whitespace-pre-wrap break-all">
+          {/* Try it - dark code block */}
+          <div className="pt-2 border-t border-[#F0EDE6]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-2">Try It</p>
+            <div className="bg-[#1A1814] rounded-lg p-3">
+              <pre className="text-xs text-[#E8E5DE] font-mono whitespace-pre-wrap break-all">
 {`curl -X POST https://control.kanoniv.com/proxy/quickbooks/default/v3/company/123/bill \\
   -H "Authorization: Bearer ${token.slice(0, 20)}..." \\
   -H "Content-Type: application/json" \\
@@ -123,13 +131,13 @@ export const CreateAgentPage: React.FC = () => {
         <motion.div variants={fadeUp} className="mt-6 flex gap-3">
           <button
             onClick={() => navigate('/')}
-            className="flex-1 bg-[#C5A572] hover:bg-[#D4BC94] text-[#0a0a0f] font-bold text-sm rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2"
+            className="flex-1 bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-4 py-3 transition-colors flex items-center justify-center gap-2"
           >
             Go to Dashboard <ArrowRight className="w-4 h-4" />
           </button>
           <button
             onClick={() => { setToken(null); setName(''); }}
-            className="bg-white/[.02] border border-white/[.07] text-[#8B8B96] hover:text-[#E8E8ED] hover:bg-white/[.05] rounded-lg px-4 py-3 text-sm transition-colors"
+            className="bg-white border border-[#E8E5DE] text-[#6B6760] hover:bg-[#F7F6F3] rounded-md px-4 py-3 text-sm font-medium transition-colors"
           >
             Create Another
           </button>
@@ -145,17 +153,17 @@ export const CreateAgentPage: React.FC = () => {
       initial="hidden" animate="show" variants={stagger}
     >
       <motion.div variants={fadeUp} className="mb-8">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1">Setup</p>
-        <h1 className="text-2xl font-bold text-[#E8E8ED]">Create Agent</h1>
-        <p className="text-xs text-[#8B8B96] mt-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1">Setup</p>
+        <h1 className="text-2xl font-display font-bold text-[#1A1814]">Create Agent</h1>
+        <p className="text-sm text-[#6B6760] mt-1">
           Pick a role template and name your agent. The delegation token defines what it can do.
         </p>
       </motion.div>
 
-      <motion.div variants={fadeUp} className="bg-[#12121a] border border-white/[.07] rounded-xl p-6 space-y-5">
+      <motion.div variants={fadeUp} className="bg-white border border-[#E8E5DE] rounded-lg shadow-[0_1px_2px_rgba(26,24,20,0.04)] p-6 space-y-5">
         {/* Name */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1.5 block">
+          <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5 block">
             Agent Name
           </label>
           <input
@@ -163,13 +171,13 @@ export const CreateAgentPage: React.FC = () => {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. ap-clerk-1"
-            className="w-full bg-[#0a0a0f] border border-white/[.07] rounded-lg px-3 py-2.5 text-sm text-[#E8E8ED] focus:outline-none focus:border-[#C5A572]/40 transition-colors"
+            className="w-full bg-[#FAFAF8] border border-[#E8E5DE] rounded-md px-3 py-2.5 text-sm text-[#1A1814] placeholder:text-[#9C978E] focus:outline-none focus:border-[#B08D3E] transition-colors"
           />
         </div>
 
         {/* Template picker */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-2 block">
+          <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-2 block">
             Role Template
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -182,19 +190,19 @@ export const CreateAgentPage: React.FC = () => {
                   onClick={() => setTemplateIdx(idx)}
                   className={`text-left p-3 rounded-lg border transition-colors ${
                     isSelected
-                      ? 'border-[#C5A572]/40 bg-[#C5A572]/5'
-                      : 'border-white/[.07] bg-[#0a0a0f] hover:border-white/[.15]'
+                      ? 'border-[#B08D3E] bg-[#FAF6ED]'
+                      : 'border-[#E8E5DE] bg-white hover:border-[#D0CDC6]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#E8E8ED]">{t.label}</span>
+                    <span className="text-sm font-medium text-[#1A1814]">{t.label}</span>
                     {t.maxCost !== undefined && t.maxCost > 0 && (
-                      <span className="text-xs font-mono tabular-nums text-[#C5A572]">
+                      <span className="text-xs font-mono font-data text-[#B08D3E]">
                         ${t.maxCost.toLocaleString()}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#55555F] mt-0.5">{t.description}</p>
+                  <p className="text-xs text-[#9C978E] mt-0.5">{t.description}</p>
                 </button>
               );
             })}
@@ -202,11 +210,11 @@ export const CreateAgentPage: React.FC = () => {
         </div>
 
         {/* Selected template details */}
-        <div className="bg-[#0a0a0f] rounded-lg p-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#55555F] mb-1.5">Permissions</p>
+        <div className="bg-[#FAFAF8] border border-[#F0EDE6] rounded-lg p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#9C978E] mb-1.5">Permissions</p>
           <div className="flex flex-wrap gap-1.5">
             {template.scopes.map(scope => (
-              <span key={scope} className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-blue-500/15 text-blue-400 border-blue-500/20">
+              <span key={scope} className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-[#EDF4FB] text-[#2E6DA4] border-[#B8D4F0]">
                 {scope}
               </span>
             ))}
@@ -217,7 +225,7 @@ export const CreateAgentPage: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-[#F87171] flex items-center gap-2"
+            className="p-3 rounded-lg bg-[#FDF0F0] border border-[#F0C6C6] text-sm text-[#C23A3A] flex items-center gap-2"
           >
             <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
           </motion.div>
@@ -225,7 +233,7 @@ export const CreateAgentPage: React.FC = () => {
 
         <button
           onClick={handleCreate}
-          className="w-full bg-[#C5A572] hover:bg-[#D4BC94] text-[#0a0a0f] font-bold text-sm rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-[#B08D3E] hover:bg-[#C5A572] text-white font-semibold text-sm rounded-md px-4 py-3 transition-colors flex items-center justify-center gap-2"
         >
           <Shield className="w-4 h-4" /> Create Agent & Generate Token
         </button>

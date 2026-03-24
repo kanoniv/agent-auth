@@ -96,3 +96,9 @@ python tests/interop/test_cross_sdk.py
 | kanoniv-agent-auth | crates.io | Check Cargo.toml |
 | kanoniv-auth | PyPI | Check sdks/kanoniv-auth/pyproject.toml |
 | @kanoniv/agent-auth | npm | Check js/package.json |
+
+## Design System
+Always read DESIGN.md before making any visual or UI decisions.
+All font choices, colors, spacing, and aesthetic direction are defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match DESIGN.md.

@@ -19,7 +19,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ entries, limit = 10 
     <div className="space-y-1.5">
       {items.map((entry, i) => {
         const isExp = expanded === entry.id;
-        const colors = actionColor[entry.action] || 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+        const colors = actionColor[entry.action] || 'bg-[#F7F6F3] text-[#6B6760] border-[#E8E5DE]';
         return (
           <motion.div
             key={entry.id}
@@ -27,26 +27,26 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ entries, limit = 10 
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
             className={cn(
-              'rounded-lg bg-[#12121a] border cursor-pointer transition-colors',
-              isExp ? 'border-[#C5A572]/30' : 'border-white/[.07] hover:border-white/[.12]',
+              'rounded-md bg-white border cursor-pointer transition-colors',
+              isExp ? 'border-[#E8DCC4] shadow-[0_1px_2px_rgba(26,24,20,0.04)]' : 'border-[#E8E5DE] hover:border-[#E8DCC4]',
             )}
             onClick={() => setExpanded(isExp ? null : entry.id)}
           >
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <span className="text-xs font-medium text-[#E8E8ED] min-w-[80px]">{entry.agent_name}</span>
+              <span className="text-xs font-medium text-[#1A1814] min-w-[80px]">{entry.agent_name}</span>
               <span className={cn('text-[10px] px-1.5 py-0.5 rounded border', colors)}>
                 {entry.action}
               </span>
               {entry.entity_ids.length > 0 && (
-                <span className="text-[10px] font-mono text-zinc-600 truncate flex-1">
+                <span className="text-[10px] font-mono text-[#9C978E] truncate flex-1">
                   {entry.entity_ids.map(id => shortId(id)).join(', ')}
                 </span>
               )}
-              <span className="text-[10px] text-zinc-600 shrink-0">{timeAgo(entry.created_at)}</span>
+              <span className="text-[10px] text-[#9C978E] shrink-0">{timeAgo(entry.created_at)}</span>
             </div>
             {isExp && Object.keys(entry.metadata).length > 0 && (
-              <div className="px-3 pb-2.5 border-t border-white/5">
-                <pre className="text-[9px] text-zinc-500 mt-2 overflow-x-auto">
+              <div className="px-3 pb-2.5 border-t border-[#F0EDE6]">
+                <pre className="text-[9px] text-[#6B6760] mt-2 overflow-x-auto font-mono">
                   {JSON.stringify(entry.metadata, null, 2)}
                 </pre>
               </div>

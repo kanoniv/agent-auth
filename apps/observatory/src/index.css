@@ -1,16 +1,43 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Geist';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 body {
   margin: 0;
-  background: #0a0a0f;
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #FAFAF8;
+  color: #1A1814;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: 'Instrument Serif', Georgia, serif;
+}
+
+.font-data {
+  font-family: 'Geist', 'DM Sans', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.font-mono {
+  font-family: 'Geist Mono', 'SFMono-Regular', monospace;
 }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
+::-webkit-scrollbar-thumb { background: #E8E5DE; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #D0CCC4; }
 
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -18,7 +45,7 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #12121a 25%, #1a1a2e 50%, #12121a 75%);
+  background: linear-gradient(90deg, #F0EDE6 25%, #FAFAF8 50%, #F0EDE6 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
