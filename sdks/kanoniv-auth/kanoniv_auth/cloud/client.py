@@ -48,13 +48,13 @@ class TrustClient:
 
     def signup(self, email: str, password: str, name: str) -> dict:
         """Create a new account. Returns api_key (shown once) + tenant info."""
-        r = self._http.post("/v1/auth/signup", json={"email": email, "password": password, "name": name})
+        r = self._http.post("/auth/signup", json={"email": email, "password": password, "name": name})
         r.raise_for_status()
         return r.json()
 
     def login(self, email: str, password: str) -> dict:
         """Log in and get a new API key."""
-        r = self._http.post("/v1/auth/login", json={"email": email, "password": password})
+        r = self._http.post("/auth/login", json={"email": email, "password": password})
         r.raise_for_status()
         return r.json()
 
@@ -176,12 +176,12 @@ class AsyncTrustClient:
         return r.json()
 
     async def signup(self, email: str, password: str, name: str) -> dict:
-        r = await self._http.post("/v1/auth/signup", json={"email": email, "password": password, "name": name})
+        r = await self._http.post("/auth/signup", json={"email": email, "password": password, "name": name})
         r.raise_for_status()
         return r.json()
 
     async def login(self, email: str, password: str) -> dict:
-        r = await self._http.post("/v1/auth/login", json={"email": email, "password": password})
+        r = await self._http.post("/auth/login", json={"email": email, "password": password})
         r.raise_for_status()
         return r.json()
 
