@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kanoniv-trust"
+version = "0.1.0"
+description = "Trust layer SDK for AI agents. Registry, delegation, provenance, reputation."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27", "click>=8.0"]
+keywords = ["agents", "trust", "delegation", "provenance", "reputation", "identity"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/kanoniv/agent-auth"
+Documentation = "https://kanoniv.com/docs"
+Observatory = "https://trust.kanoniv.com"
+
+[project.scripts]
+kt = "kanoniv_trust.cli:main"
+kanoniv-trust = "kanoniv_trust.cli:main"
