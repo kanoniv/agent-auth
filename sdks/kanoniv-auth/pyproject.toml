@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kanoniv-auth"
-version = "0.2.6"
+version = "0.4.0"
 description = "Sudo for AI agents. Replace API keys with cryptographic delegation."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = ["cryptography>=42.0"]
+dependencies = ["cryptography>=42.0", "click>=8.0"]
 keywords = ["agents", "auth", "delegation", "ci-cd", "security", "ed25519"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -27,10 +27,11 @@ Issues = "https://github.com/kanoniv/agent-auth/issues"
 
 [project.scripts]
 kanoniv-auth = "kanoniv_auth.cli:main"
+kt = "kanoniv_auth.cloud.cli:main"
 
 [project.optional-dependencies]
-cli = ["click>=8.0"]
-dev = ["pytest", "pytest-cov"]
+cloud = ["httpx>=0.27"]
+dev = ["pytest", "pytest-cov", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["kanoniv_auth"]

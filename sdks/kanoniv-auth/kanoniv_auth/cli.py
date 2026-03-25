@@ -88,10 +88,9 @@ def init(output: str | None, force: bool):
 
 @cli.command("install-skill")
 def install_skill_cmd():
-    """Install /delegate, /audit, and /status skills into Claude Code."""
+    """Install /delegate, /scope, /ttl, /audit, and /status skills into Claude Code."""
     from pathlib import Path
     import shutil
-    import importlib.resources
 
     skills_dir = Path.home() / ".claude" / "skills"
     pkg_skill = Path(__file__).parent / "skill"
@@ -109,6 +108,16 @@ def install_skill_cmd():
         shutil.copy2(pkg_skill / "bin" / script, dest)
         dest.chmod(0o755)
 
+    # Install /scope
+    scope_dir = skills_dir / "scope"
+    scope_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pkg_skill / "scope" / "SKILL.md", scope_dir / "SKILL.md")
+
+    # Install /ttl
+    ttl_dir = skills_dir / "ttl"
+    ttl_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pkg_skill / "ttl" / "SKILL.md", ttl_dir / "SKILL.md")
+
     # Install /audit
     audit_dir = skills_dir / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -119,11 +128,13 @@ def install_skill_cmd():
     status_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(pkg_skill / "status" / "SKILL.md", status_dir / "SKILL.md")
 
-    click.secho("Installed 3 kanoniv-auth skills:", fg="green", bold=True)
+    click.secho("Installed 5 kanoniv-auth skills:", fg="green", bold=True)
     click.echo()
     click.echo("  /delegate  - Start a scoped session (with enforcement hooks)")
-    click.echo("  /audit     - View the agent audit trail")
+    click.echo("  /scope     - Change scopes mid-session")
+    click.echo("  /ttl       - Extend session TTL")
     click.echo("  /status    - Check current delegation status")
+    click.echo("  /audit     - View the agent audit trail")
     click.echo()
     click.echo("Start Claude Code and type /delegate to begin.")
 
@@ -659,6 +670,14 @@ def agents_rename_cmd(old_name: str, new_name: str):
     else:
         click.echo(f"Failed: '{old_name}' not found or '{new_name}' already exists.", err=True)
         sys.exit(1)
+
+
+# Add cloud subgroup (requires httpx - optional dependency)
+try:
+    from kanoniv_auth.cloud.cli import cloud
+    cli.add_command(cloud)
+except ImportError:
+    pass
 
 
 def main():
